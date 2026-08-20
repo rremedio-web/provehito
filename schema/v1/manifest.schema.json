@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:provehito:schema:manifest:v1",
+  "title": "Provehito v1 manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "lane_id",
+    "state",
+    "dispatch",
+    "dispatch_hash",
+    "created_at",
+    "updated_at",
+    "external_actions_human_only"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "lane_id": { "type": "string", "minLength": 1 },
+    "state": {
+      "type": "string",
+      "enum": ["PLANNED", "ACTIVE", "FROZEN", "REVIEWED", "READY", "CLOSED", "BLOCKED", "ABANDONED", "INCIDENT"]
+    },
+    "blocked_from": {
+      "type": "string",
+      "enum": ["PLANNED", "ACTIVE", "FROZEN", "REVIEWED", "READY"]
+    },
+    "dispatch": { "$ref": "#/$defs/dispatch" },
+    "dispatch_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "freeze": { "$ref": "#/$defs/freeze" },
+    "review": { "$ref": "#/$defs/review" },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/evidence_reference" }
+    },
+    "failures": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/failure_record" }
+    },
+    "created_at": { "$ref": "#/$defs/timestamp" },
+    "updated_at": { "$ref": "#/$defs/timestamp" },
+    "external_actions_human_only": { "const": true }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "state": { "const": "BLOCKED" } }, "required": ["state"] },
+      "then": { "required": ["blocked_from"] },
+      "else": { "not": { "required": ["blocked_from"] } }
+    },
+    {
+      "if": {
+        "properties": { "state": { "enum": ["FROZEN", "REVIEWED", "READY", "CLOSED"] } },
+        "required": ["state"]
+      },
+      "then": { "required": ["freeze"] }
+    },
+    {
+      "if": {
+        "properties": { "state": { "enum": ["REVIEWED", "READY", "CLOSED"] } },
+        "required": ["state"]
+      },
+      "then": { "required": ["review"] }
+    },
+    {
+      "if": {
+        "properties": { "blocked_from": { "enum": ["FROZEN", "REVIEWED", "READY"] } },
+        "required": ["blocked_from"]
+      },
+      "then": { "required": ["freeze"] }
+    },
+    {
+      "if": {
+        "properties": { "blocked_from": { "enum": ["REVIEWED", "READY"] } },
+        "required": ["blocked_from"]
+      },
+      "then": { "required": ["review"] }
+    }
+  ],
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "dispatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspace",
+        "source_control",
+        "writer",
+        "adapter",
+        "family",
+        "cost_class",
+        "allowed_paths",
+        "forbidden_paths",
+        "non_goals",
+        "required_checks",
+        "review_policy",
+        "max_seconds",
+        "max_output_bytes",
+        "max_memory_bytes"
+      ],
+      "properties": {
+        "workspace": { "type": "string", "minLength": 1 },
+        "source_control": { "type": "string", "minLength": 1 },
+        "writer": { "type": "string", "minLength": 1 },
+        "adapter": { "type": "string", "minLength": 1 },
+        "family": { "type": "string", "minLength": 1 },
+        "cost_class": { "type": "string", "minLength": 1 },
+        "allowed_paths": { "$ref": "#/$defs/string_array" },
+        "forbidden_paths": { "$ref": "#/$defs/string_array" },
+        "non_goals": { "$ref": "#/$defs/string_array" },
+        "required_checks": { "$ref": "#/$defs/string_array" },
+        "review_policy": { "type": "string", "minLength": 1 },
+        "max_seconds": { "type": "integer", "minimum": 0 },
+        "max_output_bytes": { "type": "integer", "minimum": 0 },
+        "max_memory_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "string_array": { "type": "array", "items": { "type": "string" } },
+    "freeze": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base", "head", "candidate", "tree", "diff", "at"],
+      "properties": {
+        "base": { "type": "string", "minLength": 1 },
+        "head": { "type": "string", "minLength": 1 },
+        "candidate": { "type": "string", "minLength": 1 },
+        "tree": { "type": "string", "minLength": 1 },
+        "diff": { "type": "string", "minLength": 1 },
+        "at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviewer", "family", "verdict", "fingerprint", "evidence_hashes", "at"],
+      "properties": {
+        "reviewer": { "type": "string", "minLength": 1 },
+        "family": { "type": "string", "minLength": 1 },
+        "verdict": { "type": "string", "enum": ["PASS", "FAIL"] },
+        "fingerprint": { "type": "string", "minLength": 1 },
+        "evidence_hashes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        },
+        "at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "evidence_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "hash"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "failure_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class", "op", "at", "error"],
+      "properties": {
+        "class": {
+          "type": "string",
+          "enum": ["USAGE_OR_SCHEMA", "POLICY_OR_TRANSITION", "WORKSPACE_DRIFT", "TOOLING_OR_ADAPTER", "CANDIDATE_OR_REVIEW", "INTEGRITY", "CONCURRENCY"]
+        },
+        "op": { "type": "string", "minLength": 1 },
+        "at": { "$ref": "#/$defs/timestamp" },
+        "error": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

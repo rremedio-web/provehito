@@ -1,0 +1,75 @@
+package main
+
+import (
+	"context"
+	"strings"
+
+	"github.com/provehito-project/provehito/core/failure"
+	"github.com/provehito-project/provehito/core/fingerprint"
+	"github.com/provehito-project/provehito/core/lifecycle"
+	"github.com/provehito-project/provehito/core/manifest"
+)
+
+func runFreeze(args []string, stdout, stderr interface{ Write([]byte) (int, error) }) int {
+	fs := commandFlags("freeze")
+	state, jsonOutput := addStateFlags(fs)
+	lane := fs.String("lane", "", "lane identifier")
+	expected := fs.String("expected-hash", "", "expected manifest hash")
+	base := fs.String("base", "HEAD~1", "Git base revision")
+	if err := parseFlags(fs, args); err != nil {
+		return writeResult(stdout, stderr, "freeze", *jsonOutput, nil, err)
+	}
+	if *state == "" || *lane == "" {
+		return writeResult(stdout, stderr, "freeze", *jsonOutput, nil, usageError("freeze lane required"))
+	}
+	store, m, hash, err := loadLane(*state, *lane)
+	if err != nil {
+		return writeResult(stdout, stderr, "freeze", *jsonOutput, nil, err)
+	}
+	if m.State != lifecycle.Active {
+		return writeResult(stdout, stderr, "freeze", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "freeze lifecycle"))
+	}
+	if *expected != "" && *expected != hash {
+		return writeResult(stdout, stderr, "freeze", *jsonOutput, nil, failure.New(failure.Integrity, "freeze manifest prior hash mismatch"))
+	}
+	fp, err := fingerprint.NewGitProvider().Freeze(context.Background(), m.Dispatch.Workspace, *base, m.DispatchHash)
+	if err != nil {
+		return writeResult(stdout, stderr, "freeze", *jsonOutput, nil, err)
+	}
+	m.Freeze = &manifest.FreezeRecord{Base: fp.BaseCommit, Head: fp.HeadCommit, Candidate: fp.EquivalentHash, Tree: fp.HeadTree, Diff: fp.DiffHash, At: fp.FrozenAt.UTC().Format("2006-01-02T15:04:05Z")}
+	snapshot, err := lifecycle.Apply(lifecycle.Snapshot{State: m.State}, lifecycle.Freeze)
+	if err != nil {
+		return writeResult(stdout, stderr, "freeze", *jsonOutput, nil, err)
+	}
+	m.State = snapshot.State
+	newHash, err := store.Update(hash, m)
+	if err != nil {
+		return writeResult(stdout, stderr, "freeze", *jsonOutput, nil, err)
+	}
+	return writeResult(stdout, stderr, "freeze", *jsonOutput, map[string]any{
+		"candidate_hash": fp.EquivalentHash, "head": fp.HeadCommit, "tree": fp.HeadTree, "diff": fp.DiffHash,
+		"dispatch_hash": m.DispatchHash, "previous_hash": hash, "hash": newHash,
+	}, nil)
+}
+
+func hashList(m manifest.Manifest) []string {
+	values := make([]string, 0, len(m.Evidence))
+	for _, ref := range m.Evidence {
+		values = append(values, ref.Hash)
+	}
+	return values
+}
+
+func uniqueHashSet(values []string) bool {
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		if len(value) != 64 || strings.Trim(value, "0123456789abcdef") != "" {
+			return false
+		}
+		if _, exists := seen[value]; exists {
+			return false
+		}
+		seen[value] = struct{}{}
+	}
+	return len(values) > 0
+}

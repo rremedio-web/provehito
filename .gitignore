@@ -1,0 +1,9 @@
+# Local orchestration receipts are not public project content.
+.superpowers/
+
+# Release build output (local certification).
+.release/
+
+# Common local build and operating-system artifacts.
+/provehito
+.DS_Store

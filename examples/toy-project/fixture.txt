@@ -1,0 +1,3 @@
+Provehito Task 10 toy-project fixture.
+
+This file is committed in the clean Git candidate used by the vertical slice.
