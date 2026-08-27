@@ -19,8 +19,8 @@ func input() policy.Input {
 	return policy.Input{
 		State: lifecycle.Reviewed, Frozen: frozen, Current: frozen, ManifestHash: h("d"),
 		RequiredEvidence: []evidence.Reference{{Hash: h("1")}, {Hash: h("2")}}, VerifiedEvidenceHashes: []string{h("2"), h("1")},
-		Review: review.Record{ReviewerID: "r", ReviewerFamily: "reviewer", Verdict: review.Pass, CandidateEquivalentHash: h("c"), ManifestHash: h("d"), EvidenceHashes: []string{h("1"), h("2")}},
-		Family: policy.FamilyPolicy{WriterFamily: "writer", RequireIndependent: true},
+		Review: review.Record{ReviewerID: "r", ReviewerFamily: "reviewer", ReviewerSeatID: "reviewer-seat", Verdict: review.Pass, CandidateEquivalentHash: h("c"), ManifestHash: h("d"), EvidenceHashes: []string{h("1"), h("2")}},
+		Family: policy.FamilyPolicy{WriterFamily: "writer", WriterSeatID: "writer-seat", RequireIndependent: true},
 	}
 }
 
@@ -43,6 +43,7 @@ func TestReadinessRejects(t *testing.T) {
 		{"missing evidence", func(in *policy.Input) { in.VerifiedEvidenceHashes = []string{h("1")} }, 50},
 		{"tampered evidence", func(in *policy.Input) { in.VerifiedEvidenceHashes = []string{h("1"), h("3")} }, 50},
 		{"same family", func(in *policy.Input) { in.Review.ReviewerFamily = in.Family.WriterFamily }, 20},
+		{"same seat", func(in *policy.Input) { in.Review.ReviewerSeatID = in.Family.WriterSeatID }, 20},
 		{"unknown family", func(in *policy.Input) { in.Review.ReviewerFamily = "" }, 20},
 		{"fail verdict", func(in *policy.Input) { in.Review.Verdict = review.Fail }, 50},
 		{"prose approval", func(in *policy.Input) { in.Review.Verdict = ""; in.Review.SourceText = "APPROVED; ship it" }, 20},
@@ -57,5 +58,11 @@ func TestReadinessRejects(t *testing.T) {
 				t.Fatalf("got %v", err)
 			}
 		})
+	}
+}
+
+func TestReadinessAcceptsDifferentReviewerSeat(t *testing.T) {
+	if _, err := policy.NewReadiness().Evaluate(input()); err != nil {
+		t.Fatal(err)
 	}
 }

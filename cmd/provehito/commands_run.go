@@ -68,6 +68,7 @@ func runAgent(args []string, stdout, stderr interface{ Write([]byte) (int, error
 	executable := fs.String("executable", "", "absolute executable")
 	profileID := fs.String("profile-id", "", "profile identifier")
 	family := fs.String("family", "", "profile family")
+	seatID := seatIDFlag(fs)
 	cost := fs.String("cost-class", "", "profile cost class")
 	timeout := fs.String("timeout", "", "profile timeout")
 	outputLimit := fs.Int64("output-bytes", 0, "profile output limit")
@@ -80,7 +81,7 @@ func runAgent(args []string, stdout, stderr interface{ Write([]byte) (int, error
 	if err := parseFlags(fs, args); err != nil {
 		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, err)
 	}
-	if *state == "" || *lane == "" || *profileID == "" || *family == "" || *cost == "" || *timeout == "" || *outputLimit <= 0 {
+	if *state == "" || *lane == "" || *profileID == "" || *family == "" || *seatID == "" || *cost == "" || *timeout == "" || *outputLimit <= 0 {
 		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, usageError("agent profile flags required"))
 	}
 	if *executable == "" {
@@ -101,6 +102,9 @@ func runAgent(args []string, stdout, stderr interface{ Write([]byte) (int, error
 	}
 	if *profileID != m.Dispatch.Adapter || *family != m.Dispatch.Family {
 		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "agent profile dispatch mismatch"))
+	}
+	if *seatID != m.Dispatch.SeatID {
+		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "agent writer seat"))
 	}
 	duration, err := parseDuration(*timeout)
 	if err != nil {
@@ -176,6 +180,7 @@ func runAgent(args []string, stdout, stderr interface{ Write([]byte) (int, error
 	receipt, receiptErr := evidence.NewStore(*state).Add(evidence.Receipt{
 		SchemaVersion: 1,
 		MethodID:      "agent-run",
+		SeatID:        *seatID,
 		Probe:         probe,
 		CandidateHash: fp.EquivalentHash,
 		ManifestHash:  m.DispatchHash,
@@ -201,6 +206,7 @@ func runAgent(args []string, stdout, stderr interface{ Write([]byte) (int, error
 		"stdout_truncated": result.StdoutTruncated,
 		"stderr_truncated": result.StderrTruncated,
 		"duration_ms":      result.Duration.Milliseconds(),
+		"seat_id":          *seatID,
 	}
 	if runErr != nil {
 		return writeResult(stdout, stderr, "agent run", *jsonOutput, data, runErr)

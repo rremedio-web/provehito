@@ -53,6 +53,7 @@ func runReviewRecord(args []string, stdout, stderr interface{ Write([]byte) (int
 	lane := fs.String("lane", "", "lane identifier")
 	reviewer := fs.String("reviewer", "", "reviewer identity")
 	family := fs.String("family", "", "reviewer family")
+	seatID := seatIDFlag(fs)
 	verdict := fs.String("verdict", "", "PASS or FAIL")
 	fingerprintValue := fs.String("fingerprint", "", "candidate equivalent hash")
 	source := fs.String("source", "", "untrusted source text")
@@ -67,11 +68,14 @@ func runReviewRecord(args []string, stdout, stderr interface{ Write([]byte) (int
 	if m.State != lifecycle.Frozen || m.Freeze == nil {
 		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "review record lifecycle"))
 	}
-	if *reviewer == "" || *family == "" {
-		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, usageError("reviewer and family required"))
+	if *reviewer == "" || *family == "" || *seatID == "" {
+		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, usageError("reviewer, family, and seat id required"))
 	}
 	if *family == m.Dispatch.Family {
 		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "review reviewer family"))
+	}
+	if *seatID == m.Dispatch.SeatID {
+		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "review reviewer seat"))
 	}
 	fp, err := fingerprint.NewGitProvider().Freeze(context.Background(), m.Dispatch.Workspace, frozenBase(m.Freeze, *base), m.DispatchHash)
 	if err != nil {
@@ -95,7 +99,7 @@ func runReviewRecord(args []string, stdout, stderr interface{ Write([]byte) (int
 		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, err)
 	}
 	sort.Strings(evidenceHashes)
-	m.Review = &manifest.ReviewRecord{Reviewer: *reviewer, Family: *family, Verdict: verdictValue, Fingerprint: *fingerprintValue, EvidenceHashes: evidenceHashes, At: time.Now().UTC().Format(time.RFC3339)}
+	m.Review = &manifest.ReviewRecord{Reviewer: *reviewer, Family: *family, SeatID: *seatID, Verdict: verdictValue, Fingerprint: *fingerprintValue, EvidenceHashes: evidenceHashes, At: time.Now().UTC().Format(time.RFC3339)}
 	if *source != "" {
 		// Source text is deliberately not copied into the authority-bearing model.
 		_ = source
@@ -109,7 +113,7 @@ func runReviewRecord(args []string, stdout, stderr interface{ Write([]byte) (int
 	if err != nil {
 		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, err)
 	}
-	return writeResult(stdout, stderr, "review record", *jsonOutput, map[string]any{"reviewer": *reviewer, "family": *family, "verdict": verdictValue, "fingerprint": *fingerprintValue, "evidence_hashes": evidenceHashes, "previous_hash": hash, "hash": newHash}, nil)
+	return writeResult(stdout, stderr, "review record", *jsonOutput, map[string]any{"reviewer": *reviewer, "family": *family, "seat_id": *seatID, "verdict": verdictValue, "fingerprint": *fingerprintValue, "evidence_hashes": evidenceHashes, "previous_hash": hash, "hash": newHash}, nil)
 }
 
 func parseVerdict(value string) (string, error) {
@@ -216,8 +220,8 @@ func runReady(args []string, stdout, stderr interface{ Write([]byte) (int, error
 	if !sameFrozen(m.Freeze, fp) {
 		return writeResult(stdout, stderr, "ready", *jsonOutput, nil, failure.New(failure.CandidateOrReview, "ready candidate drift"))
 	}
-	record := review.Record{ReviewerID: m.Review.Reviewer, ReviewerFamily: m.Review.Family, Verdict: review.Verdict(m.Review.Verdict), CandidateEquivalentHash: m.Review.Fingerprint, ManifestHash: m.DispatchHash, EvidenceHashes: append([]string(nil), m.Review.EvidenceHashes...)}
-	ready, err := policy.NewReadiness().Evaluate(policy.Input{State: m.State, Frozen: fp, Current: fp, ManifestHash: m.DispatchHash, RequiredEvidence: refs, VerifiedEvidenceHashes: verified, Review: record, Family: policy.FamilyPolicy{WriterFamily: m.Dispatch.Family, RequireIndependent: true}})
+	record := review.Record{ReviewerID: m.Review.Reviewer, ReviewerFamily: m.Review.Family, ReviewerSeatID: m.Review.SeatID, Verdict: review.Verdict(m.Review.Verdict), CandidateEquivalentHash: m.Review.Fingerprint, ManifestHash: m.DispatchHash, EvidenceHashes: append([]string(nil), m.Review.EvidenceHashes...)}
+	ready, err := policy.NewReadiness().Evaluate(policy.Input{State: m.State, Frozen: fp, Current: fp, ManifestHash: m.DispatchHash, RequiredEvidence: refs, VerifiedEvidenceHashes: verified, Review: record, Family: policy.FamilyPolicy{WriterFamily: m.Dispatch.Family, WriterSeatID: m.Dispatch.SeatID, RequireIndependent: true}})
 	if err != nil {
 		return writeResult(stdout, stderr, "ready", *jsonOutput, nil, err)
 	}

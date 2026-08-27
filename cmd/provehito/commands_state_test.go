@@ -179,7 +179,7 @@ func TestLaneOpenProducesActiveManifestAndStableJSON(t *testing.T) {
 		t.Fatalf("init: %d", code)
 	}
 	args := []string{"lane", "open", "--state", state, "--id", "demo-lane", "--workspace", workspace,
-		"--source-control", "git", "--writer", "writer", "--adapter", "local", "--family", "family",
+		"--source-control", "git", "--writer", "writer", "--adapter", "local", "--family", "family", "--seat-id", "writer-seat",
 		"--cost-class", "economy", "--allowed-paths", "cmd", "--forbidden-paths", "secrets",
 		"--non-goals", "deploy", "--required-checks", "test", "--review-policy", "one",
 		"--max-seconds", "10", "--max-output-bytes", "100", "--max-memory-bytes", "200", "--json"}
@@ -206,6 +206,27 @@ func TestLaneOpenProducesActiveManifestAndStableJSON(t *testing.T) {
 	}
 }
 
+func TestLaneOpenUsesSeatIDEnvironment(t *testing.T) {
+	t.Setenv("PROVEHITO_SEAT_ID", "environment-seat")
+	state := filepath.Join(t.TempDir(), "runtime")
+	workspace := t.TempDir()
+	if code := Run([]string{"init", "--state", state, "--workspace", workspace}, &bytes.Buffer{}, &bytes.Buffer{}); code != 0 {
+		t.Fatalf("init: %d", code)
+	}
+	args := []string{"lane", "open", "--state", state, "--id", "env-lane", "--workspace", workspace,
+		"--source-control", "git", "--writer", "writer", "--adapter", "local", "--family", "family",
+		"--cost-class", "economy", "--allowed-paths", "cmd", "--forbidden-paths", "none",
+		"--non-goals", "deploy", "--required-checks", "test", "--review-policy", "one",
+		"--max-seconds", "1", "--max-output-bytes", "1", "--max-memory-bytes", "1", "--json"}
+	var out bytes.Buffer
+	if code := Run(args, &out, &bytes.Buffer{}); code != 0 {
+		t.Fatalf("open from environment: %d %s", code, out.String())
+	}
+	if !strings.Contains(out.String(), `"seat_id":"environment-seat"`) {
+		t.Fatalf("seat id missing from output: %s", out.String())
+	}
+}
+
 func TestLaneLifecycleUsesExpectedHashAndRejectsIllegalTransitions(t *testing.T) {
 	stateParent := t.TempDir()
 	state := filepath.Join(stateParent, "runtime")
@@ -214,7 +235,7 @@ func TestLaneLifecycleUsesExpectedHashAndRejectsIllegalTransitions(t *testing.T)
 		t.Fatalf("init: %d", code)
 	}
 	open := []string{"lane", "open", "--state", state, "--id", "demo", "--workspace", workspace,
-		"--source-control", "git", "--writer", "writer", "--adapter", "local", "--family", "family",
+		"--source-control", "git", "--writer", "writer", "--adapter", "local", "--family", "family", "--seat-id", "writer-seat",
 		"--cost-class", "economy", "--allowed-paths", "cmd", "--forbidden-paths", "none",
 		"--non-goals", "deploy", "--required-checks", "test", "--review-policy", "one",
 		"--max-seconds", "1", "--max-output-bytes", "1", "--max-memory-bytes", "1"}
@@ -240,6 +261,48 @@ func TestLaneLifecycleUsesExpectedHashAndRejectsIllegalTransitions(t *testing.T)
 	code, illegal, _ := runJSON(t, "lane", "resume", "--state", state, "--id", "demo", "--expected-hash", activeHash)
 	if code != 20 || illegal["class"] != "POLICY_OR_TRANSITION" {
 		t.Fatalf("illegal resume: %d %#v", code, illegal)
+	}
+}
+
+func TestLaneListReturnsSortedCurrentStateWithoutWriting(t *testing.T) {
+	state := filepath.Join(t.TempDir(), "runtime")
+	workspace := t.TempDir()
+	if code := Run([]string{"init", "--state", state, "--workspace", workspace}, &bytes.Buffer{}, &bytes.Buffer{}); code != 0 {
+		t.Fatalf("init: %d", code)
+	}
+	first := mustCLI(t, state, completeOpenArgs(state, "beta", workspace)...)
+	second := mustCLI(t, state, completeOpenArgs(state, "alpha", workspace)...)
+	if code, _, _ := runJSON(t, "lane", "block", "--state", state, "--id", "beta", "--expected-hash", first.String("hash")); code != 0 {
+		t.Fatalf("block beta: %d", code)
+	}
+	_ = second
+	before, err := snapshotTree(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, result, _ := runJSON(t, "lane", "list", "--state", state)
+	if code != 0 {
+		t.Fatalf("lane list: %d %#v", code, result)
+	}
+	rows, ok := result["data"].(map[string]any)["lanes"].([]any)
+	if !ok || len(rows) != 2 {
+		t.Fatalf("lane list rows: %#v", result)
+	}
+	firstRow, secondRow := rows[0].(map[string]any), rows[1].(map[string]any)
+	if firstRow["lane_id"] != "alpha" || firstRow["state"] != "ACTIVE" || secondRow["lane_id"] != "beta" || secondRow["state"] != "BLOCKED" || secondRow["blocked_from"] != "ACTIVE" {
+		t.Fatalf("lane list contents: %#v", rows)
+	}
+	for _, row := range rows {
+		if row.(map[string]any)["updated_at"] == "" {
+			t.Fatalf("lane row missing updated_at: %#v", row)
+		}
+	}
+	after, err := snapshotTree(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before != after {
+		t.Fatalf("lane list mutated state: before=%s after=%s", before, after)
 	}
 }
 
@@ -299,7 +362,7 @@ func snapshotTree(root string) (string, error) {
 
 func completeOpenArgs(state, id, workspace string) []string {
 	return []string{"lane", "open", "--state", state, "--id", id, "--workspace", workspace,
-		"--source-control", "git", "--writer", "writer", "--adapter", "local", "--family", "family",
+		"--source-control", "git", "--writer", "writer", "--adapter", "local", "--family", "family", "--seat-id", "writer-seat",
 		"--cost-class", "economy", "--allowed-paths", "cmd", "--forbidden-paths", "none",
 		"--non-goals", "deploy", "--required-checks", "test", "--review-policy", "one",
 		"--max-seconds", "1", "--max-output-bytes", "1", "--max-memory-bytes", "1"}

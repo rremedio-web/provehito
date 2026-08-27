@@ -6,4 +6,5 @@
 
 # Common local build and operating-system artifacts.
 /provehito
+.gocache/
 .DS_Store

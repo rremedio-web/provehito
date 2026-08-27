@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/provehito-project/provehito/core/canon"
@@ -55,6 +56,10 @@ func addStateFlags(fs *flag.FlagSet) (*string, *bool) {
 	return state, jsonOutput
 }
 
+func seatIDFlag(fs *flag.FlagSet) *string {
+	return fs.String("seat-id", os.Getenv("PROVEHITO_SEAT_ID"), "independent process seat identity")
+}
+
 func parseFlags(fs *flag.FlagSet, args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return usageError("invalid flags")
@@ -94,6 +99,17 @@ func lanePath(state, id string) (string, error) {
 	if err := requireStateRoot(state); err != nil {
 		return "", err
 	}
+	lanes, err := lanesPath(state)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(lanes, id+".json"), nil
+}
+
+func lanesPath(state string) (string, error) {
+	if err := requireStateRoot(state); err != nil {
+		return "", err
+	}
 	lanes := filepath.Join(state, "lanes")
 	info, err := os.Lstat(lanes)
 	if err != nil {
@@ -105,7 +121,7 @@ func lanePath(state, id string) (string, error) {
 	if info.Mode().Perm() != 0700 {
 		return "", failure.New(failure.Integrity, "lanes directory mode")
 	}
-	return filepath.Join(lanes, id+".json"), nil
+	return lanes, nil
 }
 
 func requireWorkspace(path string) error {
@@ -189,6 +205,8 @@ func runLane(operation string, args []string, stdout, stderr io.Writer) int {
 	switch operation {
 	case "open":
 		return runLaneOpen(args, stdout, stderr)
+	case "list":
+		return runLaneList(args, stdout, stderr)
 	case "validate", "status":
 		return runLaneRead(operation, args, stdout, stderr)
 	case "block", "resume", "abandon", "incident":
@@ -208,6 +226,7 @@ func runLaneOpen(args []string, stdout, stderr io.Writer) int {
 	writer := fs.String("writer", "", "writer identity")
 	adapter := fs.String("adapter", "", "adapter profile")
 	family := fs.String("family", "", "review family")
+	seatID := seatIDFlag(fs)
 	costClass := fs.String("cost-class", "", "cost class")
 	reviewPolicy := fs.String("review-policy", "", "review policy")
 	maxSeconds := fs.Int64("max-seconds", -1, "maximum seconds")
@@ -228,7 +247,7 @@ func runLaneOpen(args []string, stdout, stderr io.Writer) int {
 	if !laneIDPattern.MatchString(*id) {
 		return writeResult(stdout, stderr, "lane open", *jsonOutput, nil, usageError("lane id must be a lowercase slug"))
 	}
-	if err := completeDispatch(*id, *workspacePath, *sourceControl, *writer, *adapter, *family, *costClass, *reviewPolicy, *maxSeconds, *maxOutput, *maxMemory, allowed, forbidden, nonGoals, required); err != nil {
+	if err := completeDispatch(*id, *workspacePath, *sourceControl, *writer, *adapter, *family, *seatID, *costClass, *reviewPolicy, *maxSeconds, *maxOutput, *maxMemory, allowed, forbidden, nonGoals, required); err != nil {
 		return writeResult(stdout, stderr, "lane open", *jsonOutput, nil, err)
 	}
 	if err := requireWorkspace(*workspacePath); err != nil {
@@ -242,7 +261,7 @@ func runLaneOpen(args []string, stdout, stderr io.Writer) int {
 		return writeResult(stdout, stderr, "lane open", *jsonOutput, nil, err)
 	}
 	m := manifest.Manifest{SchemaVersion: 1, LaneID: *id, State: lifecycle.Planned, Dispatch: manifest.Dispatch{
-		Workspace: *workspacePath, SourceControl: *sourceControl, Writer: *writer, Adapter: *adapter, Family: *family, CostClass: *costClass,
+		Workspace: *workspacePath, SourceControl: *sourceControl, Writer: *writer, Adapter: *adapter, Family: *family, SeatID: *seatID, CostClass: *costClass,
 		AllowedPaths: allowed.values, ForbiddenPaths: forbidden.values, NonGoals: nonGoals.values, RequiredChecks: required.values,
 		ReviewPolicy: *reviewPolicy, MaxSeconds: *maxSeconds, MaxOutputBytes: *maxOutput, MaxMemoryBytes: *maxMemory,
 	}, ExternalActionsHumanOnly: true}
@@ -255,11 +274,11 @@ func runLaneOpen(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeResult(stdout, stderr, "lane open", *jsonOutput, nil, err)
 	}
-	return writeResult(stdout, stderr, "lane open", *jsonOutput, map[string]any{"id": *id, "state": string(m.State), "hash": hash, "path": path}, nil)
+	return writeResult(stdout, stderr, "lane open", *jsonOutput, map[string]any{"id": *id, "state": string(m.State), "seat_id": *seatID, "hash": hash, "path": path}, nil)
 }
 
-func completeDispatch(id, work, source, writer, adapter, family, cost, review string, seconds, output, memory int64, lists ...listFlag) error {
-	if !laneIDPattern.MatchString(id) || work == "" || source == "" || writer == "" || adapter == "" || family == "" || cost == "" || review == "" || seconds < 0 || output < 0 || memory < 0 {
+func completeDispatch(id, work, source, writer, adapter, family, seatID, cost, review string, seconds, output, memory int64, lists ...listFlag) error {
+	if !laneIDPattern.MatchString(id) || work == "" || source == "" || writer == "" || adapter == "" || family == "" || seatID == "" || cost == "" || review == "" || seconds < 0 || output < 0 || memory < 0 {
 		return usageError("lane open requires complete dispatch")
 	}
 	for _, list := range lists {
@@ -273,6 +292,42 @@ func completeDispatch(id, work, source, writer, adapter, family, cost, review st
 		}
 	}
 	return nil
+}
+
+type laneSummary struct {
+	LaneID      string          `json:"lane_id"`
+	State       lifecycle.State `json:"state"`
+	UpdatedAt   string          `json:"updated_at"`
+	BlockedFrom lifecycle.State `json:"blocked_from,omitempty"`
+}
+
+func runLaneList(args []string, stdout, stderr io.Writer) int {
+	fs := commandFlags("lane list")
+	state, jsonOutput := addStateFlags(fs)
+	if err := parseFlags(fs, args); err != nil {
+		return writeResult(stdout, stderr, "lane list", *jsonOutput, nil, err)
+	}
+	laneDir, err := lanesPath(*state)
+	if err != nil {
+		return writeResult(stdout, stderr, "lane list", *jsonOutput, nil, err)
+	}
+	entries, err := os.ReadDir(laneDir)
+	if err != nil {
+		return writeResult(stdout, stderr, "lane list", *jsonOutput, nil, failure.Wrap(failure.Integrity, "lanes directory read", err))
+	}
+	rows := make([]laneSummary, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		m, _, err := manifest.NewStore(filepath.Join(laneDir, entry.Name()), clock.System{}).Load()
+		if err != nil {
+			return writeResult(stdout, stderr, "lane list", *jsonOutput, nil, err)
+		}
+		rows = append(rows, laneSummary{LaneID: m.LaneID, State: m.State, UpdatedAt: m.UpdatedAt, BlockedFrom: m.BlockedFrom})
+	}
+	sort.Slice(rows, func(i, j int) bool { return rows[i].LaneID < rows[j].LaneID })
+	return writeResult(stdout, stderr, "lane list", *jsonOutput, map[string]any{"lanes": rows}, nil)
 }
 
 func runLaneRead(operation string, args []string, stdout, stderr io.Writer) int {

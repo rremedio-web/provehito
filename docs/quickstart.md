@@ -35,7 +35,7 @@ go build -o "$BIN" ./cmd/provehito
 
 OPEN_JSON=$("$BIN" lane open \
   --state "$STATE" --id demo --workspace "$REPO" \
-  --writer writer-1 --family family-a --source-control git \
+  --writer writer-1 --family family-a --seat-id writer-seat --source-control git \
   --adapter local --cost-class economy \
   --allowed-paths . --forbidden-paths generated \
   --non-goals deploy --required-checks fixture-check \
@@ -51,7 +51,7 @@ OPEN_HASH=$(printf '%s\n' "$OPEN_JSON" |
 # literally; Provehito does not invoke a shell.
 "$BIN" agent run \
   --state "$STATE" --lane demo --profile /bin/echo \
-  --profile-id local --family family-a --cost-class economy \
+  --profile-id local --family family-a --seat-id writer-seat --cost-class economy \
   --capability writer --timeout 5s --output-bytes 4096 \
   --arg agent-run --json
 
@@ -74,7 +74,7 @@ RECEIPT_REF=$(printf '%s\n' "$RECEIPT_JSON" |
 "$BIN" review open --state "$STATE" --lane demo --json
 "$BIN" review record \
   --state "$STATE" --lane demo --reviewer reviewer-1 \
-  --family family-b --verdict PASS --fingerprint "$CANDIDATE_HASH" --json
+  --family family-b --seat-id reviewer-seat --verdict PASS --fingerprint "$CANDIDATE_HASH" --json
 "$BIN" ready --state "$STATE" --lane demo --json
 "$BIN" close --state "$STATE" --lane demo --json
 "$BIN" lane status --state "$STATE" --id demo --json
@@ -96,6 +96,6 @@ the manifest and receipts; remove the temporary directory when finished.
    diff fingerprints. The expected manifest hash prevents stale updates.
 5. `evidence add` stores a SHA-256 receipt bound to the frozen candidate and
    manifest; `verify` checks the immutable bytes.
-6. Review is recorded only for the frozen candidate and a different family.
+6. Review is recorded only for the frozen candidate, a different family, and a different seat.
 7. `ready` checks the lifecycle, exact candidate, required successful evidence,
    and review binding. It does not call an external action.

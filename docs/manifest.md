@@ -20,7 +20,7 @@ YAML and unknown JSON fields are not authoritative in Phase 1.
 | `dispatch` | Workspace, identities, policy lists, review policy, and limits. |
 | `dispatch_hash` | SHA-256 hash of canonical dispatch JSON. |
 | `freeze` | Base/head/tree/diff candidate fingerprints and timestamp. |
-| `review` | Reviewer, family, verdict, fingerprint, evidence hashes, timestamp. |
+| `review` | Reviewer, family, seat ID, verdict, fingerprint, evidence hashes, timestamp. |
 | `evidence` | Named references to immutable receipt hashes. |
 | `failures` | Typed failure records, when recorded by a caller. |
 | `created_at`, `updated_at` | UTC RFC3339 timestamps to the second. |
@@ -30,8 +30,9 @@ YAML and unknown JSON fields are not authoritative in Phase 1.
 
 `dispatch` records the assigned workspace and source-control identity, writer,
 adapter, family, cost class, allowed paths, forbidden paths, non-goals,
-required checks, review policy, and three numeric limits:
-`max_seconds`, `max_output_bytes`, and `max_memory_bytes`.
+seat ID, required checks, review policy, and three numeric limits:
+`max_seconds`, `max_output_bytes`, and `max_memory_bytes`. `seat_id` may be
+supplied with `--seat-id` or `PROVEHITO_SEAT_ID` when opening the lane.
 
 These values are policy data. Phase 1 uses the time and output values to gate an
 `agent run`; it records `allowed_paths`, `forbidden_paths`, and
@@ -51,7 +52,8 @@ When `freeze` succeeds, the manifest records:
 When a review is recorded, its `fingerprint` must equal the frozen candidate.
 Its evidence hashes must identify verified successful receipts bound to the
 same candidate and dispatch. Changing the candidate or required evidence makes
-the review unusable for `READY`.
+the review unusable for `READY`. Independent review also requires a reviewer
+seat ID different from the writer seat ID.
 
 ## Canonicalization and integrity
 
@@ -76,3 +78,9 @@ Both commands return the lane identifier, current state, manifest hash, and
 manifest path. They do not repair or rewrite a manifest. `doctor` is also
 read-only and checks the state root, schema readability, Git, and workspace
 separation.
+
+To inspect all lanes without a persisted index:
+
+```bash
+provehito lane list --state "$STATE" --json
+```

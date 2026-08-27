@@ -44,6 +44,7 @@ ends in `CLOSED` without a model account, network connection, or credential.
 | `init` | Create a private state root outside the assigned workspace. |
 | `doctor` | Read-only checks for the OS, Git, schema, state, and separation. |
 | `lane open` | Record a complete dispatch and activate a lane. |
+| `lane list` | Read-only aggregate of current lane state. |
 | `lane validate` / `lane status` | Read a manifest and its current hash. |
 | `lane block` / `resume` / `abandon` / `incident` | Apply explicit lifecycle events. |
 | `agent run` | Run one configured local process in the foreground. |
@@ -54,7 +55,7 @@ ends in `CLOSED` without a model account, network connection, or credential.
 | `close` | Close a ready lane. |
 
 Every command has `--json`, with stable `ok`, `command`, `class`, `message`,
-and `data` fields. See [docs/lifecycle.md](docs/lifecycle.md),
+optional `correction`, and `data` fields. See [docs/lifecycle.md](docs/lifecycle.md),
 [docs/manifest.md](docs/manifest.md), [docs/evidence.md](docs/evidence.md), and
 [docs/troubleshooting.md](docs/troubleshooting.md).
 
