@@ -93,6 +93,7 @@
         "writer",
         "adapter",
         "family",
+        "seat_id",
         "cost_class",
         "allowed_paths",
         "forbidden_paths",
@@ -109,6 +110,7 @@
         "writer": { "type": "string", "minLength": 1 },
         "adapter": { "type": "string", "minLength": 1 },
         "family": { "type": "string", "minLength": 1 },
+        "seat_id": { "type": "string", "minLength": 1 },
         "cost_class": { "type": "string", "minLength": 1 },
         "allowed_paths": { "$ref": "#/$defs/string_array" },
         "forbidden_paths": { "$ref": "#/$defs/string_array" },
@@ -137,10 +139,11 @@
     "review": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["reviewer", "family", "verdict", "fingerprint", "evidence_hashes", "at"],
+      "required": ["reviewer", "family", "seat_id", "verdict", "fingerprint", "evidence_hashes", "at"],
       "properties": {
         "reviewer": { "type": "string", "minLength": 1 },
         "family": { "type": "string", "minLength": 1 },
+        "seat_id": { "type": "string", "minLength": 1 },
         "verdict": { "type": "string", "enum": ["PASS", "FAIL"] },
         "fingerprint": { "type": "string", "minLength": 1 },
         "evidence_hashes": {

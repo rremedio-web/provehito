@@ -42,11 +42,11 @@ func TestAgentRunDoesNotPersistSubprocessPlaintext(t *testing.T) {
 	repo := newCleanGitFixture(t)
 	state := t.TempDir()
 	mustCLI(t, state, "init", "--workspace", repo)
-	mustCLI(t, state, "lane", "open", "--id", "demo", "--workspace", repo, "--writer", "writer-1", "--family", "family-a", "--source-control", "git", "--adapter", "local", "--cost-class", "economy", "--allowed-paths", "cmd", "--forbidden-paths", "none", "--non-goals", "deploy", "--required-checks", "fixture-check", "--review-policy", "independent", "--max-seconds", "5", "--max-output-bytes", "4096", "--max-memory-bytes", "0")
+	mustCLI(t, state, "lane", "open", "--id", "demo", "--workspace", repo, "--writer", "writer-1", "--family", "family-a", "--seat-id", "writer-seat", "--source-control", "git", "--adapter", "local", "--cost-class", "economy", "--allowed-paths", "cmd", "--forbidden-paths", "none", "--non-goals", "deploy", "--required-checks", "fixture-check", "--review-policy", "independent", "--max-seconds", "5", "--max-output-bytes", "4096", "--max-memory-bytes", "0")
 	profile := fakeProfile(t)
 	args := []string{
 		"agent", "run", "--lane", "demo", "--profile", profile,
-		"--profile-id", "local", "--family", "family-a", "--cost-class", "economy",
+		"--profile-id", "local", "--family", "family-a", "--seat-id", "writer-seat", "--cost-class", "economy",
 		"--capability", "writer", "--timeout", "5s", "--output-bytes", "4096",
 		"--arg", "--print-secrets", "--state", state, "--json",
 	}
@@ -96,6 +96,9 @@ func TestAgentRunDoesNotPersistSubprocessPlaintext(t *testing.T) {
 	if strings.Contains(loaded.Probe, tokenSecret) || strings.Contains(loaded.Probe, plainSecret) {
 		t.Fatalf("probe contained subprocess plaintext: %q", loaded.Probe)
 	}
+	if loaded.SeatID != "writer-seat" {
+		t.Fatalf("receipt seat_id: got %q", loaded.SeatID)
+	}
 	stdoutRef, stderrRef := artifactRef(loaded.Artifacts, "stdout"), artifactRef(loaded.Artifacts, "stderr")
 	if stdoutRef == nil || stderrRef == nil {
 		t.Fatalf("missing stdout/stderr artifact refs: %#v", loaded.Artifacts)
@@ -119,14 +122,14 @@ func TestAgentRunPrelaunchFailureUsesEmptyStreamHashes(t *testing.T) {
 	repo := newCleanGitFixture(t)
 	state := t.TempDir()
 	mustCLI(t, state, "init", "--workspace", repo)
-	mustCLI(t, state, "lane", "open", "--id", "demo", "--workspace", repo, "--writer", "writer-1", "--family", "family-a", "--source-control", "git", "--adapter", "local", "--cost-class", "economy", "--allowed-paths", "cmd", "--forbidden-paths", "none", "--non-goals", "deploy", "--required-checks", "fixture-check", "--review-policy", "independent", "--max-seconds", "5", "--max-output-bytes", "4096", "--max-memory-bytes", "0")
+	mustCLI(t, state, "lane", "open", "--id", "demo", "--workspace", repo, "--writer", "writer-1", "--family", "family-a", "--seat-id", "writer-seat", "--source-control", "git", "--adapter", "local", "--cost-class", "economy", "--allowed-paths", "cmd", "--forbidden-paths", "none", "--non-goals", "deploy", "--required-checks", "fixture-check", "--review-policy", "independent", "--max-seconds", "5", "--max-output-bytes", "4096", "--max-memory-bytes", "0")
 	missing := filepath.Join(t.TempDir(), "not-executable")
 	if err := os.WriteFile(missing, []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	args := []string{
 		"agent", "run", "--lane", "demo", "--profile", missing,
-		"--profile-id", "local", "--family", "family-a", "--cost-class", "economy",
+		"--profile-id", "local", "--family", "family-a", "--seat-id", "writer-seat", "--cost-class", "economy",
 		"--capability", "writer", "--timeout", "1s", "--output-bytes", "32",
 		"--state", state, "--json",
 	}

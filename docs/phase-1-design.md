@@ -138,7 +138,7 @@ Each lane has one canonical manifest containing:
 - immutable dispatch fields and their canonical hash;
 - frozen candidate, tree, and diff fingerprints;
 - evidence receipt references and hashes;
-- reviewer identity, family, verdict, and reviewed fingerprint;
+- reviewer identity, family, seat ID, verdict, and reviewed fingerprint;
 - timestamps and typed failure records;
 - a declaration that external actions are human-only.
 
@@ -154,7 +154,7 @@ Phase 1 exposes:
 ```text
 provehito init
 provehito doctor
-provehito lane open|validate|status|block|resume|abandon|incident
+provehito lane open|list|validate|status|block|resume|abandon|incident
 provehito agent run
 provehito freeze
 provehito evidence add|verify
@@ -208,9 +208,10 @@ selects the cheapest available profile satisfying the requested capability and
 policy. Premium profiles are reserved for explicitly declared high-risk work or
 final acceptance.
 
-When independent-family review is required, the reviewer family must differ from
-the writer family. Unknown family data fails the requirement rather than acting
-as an exemption. No provider or model name is hard-coded into the core.
+When independent review is required, the reviewer family and seat ID must differ
+from the writer family and seat ID. Unknown identity data fails the requirement
+rather than acting as an exemption. No provider or model name is hard-coded into
+the core.
 
 ## Fingerprints, evidence, and review
 

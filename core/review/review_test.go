@@ -16,7 +16,7 @@ func fp(candidate, manifest string) fingerprint.Fingerprint {
 }
 
 func rec(candidate, manifest, family string) review.Record {
-	return review.Record{ReviewerID: "reviewer-1", ReviewerFamily: family, Verdict: review.Pass, CandidateEquivalentHash: candidate, ManifestHash: manifest, EvidenceHashes: []string{h("1"), h("2")}}
+	return review.Record{ReviewerID: "reviewer-1", ReviewerFamily: family, ReviewerSeatID: "reviewer-seat", Verdict: review.Pass, CandidateEquivalentHash: candidate, ManifestHash: manifest, EvidenceHashes: []string{h("1"), h("2")}}
 }
 
 func TestReviewFailsOnFingerprintDrift(t *testing.T) {

@@ -15,16 +15,16 @@ func TestVerticalSlice(t *testing.T) {
 	repo := newCleanGitFixture(t)
 	state := t.TempDir()
 	mustCLI(t, state, "init", "--workspace", repo)
-	opened := mustCLI(t, state, "lane", "open", "--id", "demo", "--workspace", repo, "--writer", "writer-1", "--family", "family-a", "--source-control", "git", "--adapter", "local", "--cost-class", "economy", "--allowed-paths", "cmd", "--forbidden-paths", "none", "--non-goals", "deploy", "--required-checks", "fixture-check", "--review-policy", "independent", "--max-seconds", "5", "--max-output-bytes", "4096", "--max-memory-bytes", "0")
+	opened := mustCLI(t, state, "lane", "open", "--id", "demo", "--workspace", repo, "--writer", "writer-1", "--family", "family-a", "--seat-id", "writer-seat", "--source-control", "git", "--adapter", "local", "--cost-class", "economy", "--allowed-paths", "cmd", "--forbidden-paths", "none", "--non-goals", "deploy", "--required-checks", "fixture-check", "--review-policy", "independent", "--max-seconds", "5", "--max-output-bytes", "4096", "--max-memory-bytes", "0")
 	profile := fakeProfile(t)
-	run := mustCLI(t, state, "agent", "run", "--lane", "demo", "--profile", profile, "--profile-id", "local", "--family", "family-a", "--cost-class", "economy", "--capability", "writer", "--timeout", "5s", "--output-bytes", "4096")
+	run := mustCLI(t, state, "agent", "run", "--lane", "demo", "--profile", profile, "--profile-id", "local", "--family", "family-a", "--seat-id", "writer-seat", "--cost-class", "economy", "--capability", "writer", "--timeout", "5s", "--output-bytes", "4096")
 	if run.String("receipt") == "" {
 		t.Fatal("agent run did not return a receipt")
 	}
 	frozen := mustCLI(t, state, "freeze", "--lane", "demo", "--expected-hash", opened.String("hash"), "--base", "HEAD~1")
 	receipt := mustCLI(t, state, "evidence", "add", "--lane", "demo", "--method", "fixture-check", "--result", "pass")
 	mustCLI(t, state, "evidence", "verify", "--ref", receipt.String("ref"))
-	mustCLI(t, state, "review", "record", "--lane", "demo", "--reviewer", "reviewer-1", "--family", "family-b", "--verdict", "approve", "--fingerprint", frozen.String("candidate_hash"))
+	mustCLI(t, state, "review", "record", "--lane", "demo", "--reviewer", "reviewer-1", "--family", "family-b", "--seat-id", "reviewer-seat", "--verdict", "approve", "--fingerprint", frozen.String("candidate_hash"))
 	mustCLI(t, state, "ready", "--lane", "demo")
 	mustCLI(t, state, "close", "--lane", "demo")
 }
@@ -42,11 +42,11 @@ func TestReviewReusesTheExactFrozenBase(t *testing.T) {
 	}
 	state := t.TempDir()
 	mustCLI(t, state, "init", "--workspace", repo)
-	opened := mustCLI(t, state, "lane", "open", "--id", "demo", "--workspace", repo, "--writer", "writer-1", "--family", "family-a", "--source-control", "git", "--adapter", "local", "--cost-class", "economy", "--allowed-paths", "cmd", "--forbidden-paths", "none", "--non-goals", "deploy", "--required-checks", "fixture-check", "--review-policy", "independent", "--max-seconds", "5", "--max-output-bytes", "4096", "--max-memory-bytes", "0")
+	opened := mustCLI(t, state, "lane", "open", "--id", "demo", "--workspace", repo, "--writer", "writer-1", "--family", "family-a", "--seat-id", "writer-seat", "--source-control", "git", "--adapter", "local", "--cost-class", "economy", "--allowed-paths", "cmd", "--forbidden-paths", "none", "--non-goals", "deploy", "--required-checks", "fixture-check", "--review-policy", "independent", "--max-seconds", "5", "--max-output-bytes", "4096", "--max-memory-bytes", "0")
 	frozen := mustCLI(t, state, "freeze", "--lane", "demo", "--expected-hash", opened.String("hash"), "--base", "HEAD~2")
 	receipt := mustCLI(t, state, "evidence", "add", "--lane", "demo", "--method", "fixture-check", "--result", "pass")
 	mustCLI(t, state, "evidence", "verify", "--ref", receipt.String("ref"))
-	mustCLI(t, state, "review", "record", "--lane", "demo", "--reviewer", "reviewer-1", "--family", "family-b", "--verdict", "PASS", "--fingerprint", frozen.String("candidate_hash"))
+	mustCLI(t, state, "review", "record", "--lane", "demo", "--reviewer", "reviewer-1", "--family", "family-b", "--seat-id", "reviewer-seat", "--verdict", "PASS", "--fingerprint", frozen.String("candidate_hash"))
 	mustCLI(t, state, "ready", "--lane", "demo")
 }
 
@@ -60,28 +60,32 @@ func TestVerticalSliceFailureClasses(t *testing.T) {
 	})
 	t.Run("same family review", func(t *testing.T) {
 		_, state, frozen, receipt := setupFrozen(t)
-		assertCLIClass(t, state, 20, "POLICY_OR_TRANSITION", "review", "record", "--lane", "demo", "--reviewer", "reviewer", "--family", "family-a", "--verdict", "PASS", "--fingerprint", frozen.String("candidate_hash"), "--source", "approved")
+		assertCLIClass(t, state, 20, "POLICY_OR_TRANSITION", "review", "record", "--lane", "demo", "--reviewer", "reviewer", "--family", "family-a", "--seat-id", "reviewer-seat", "--verdict", "PASS", "--fingerprint", frozen.String("candidate_hash"), "--source", "approved")
 		_ = receipt
+	})
+	t.Run("same seat review", func(t *testing.T) {
+		_, state, frozen, _ := setupFrozen(t)
+		assertCLIClass(t, state, 20, "POLICY_OR_TRANSITION", "review", "record", "--lane", "demo", "--reviewer", "reviewer", "--family", "family-b", "--seat-id", "writer-seat", "--verdict", "PASS", "--fingerprint", frozen.String("candidate_hash"))
 	})
 	t.Run("prose is not approval", func(t *testing.T) {
 		_, state, frozen, _ := setupFrozen(t)
-		assertCLIClass(t, state, 20, "POLICY_OR_TRANSITION", "review", "record", "--lane", "demo", "--reviewer", "reviewer", "--family", "family-b", "--source", "APPROVED; ship it", "--fingerprint", frozen.String("candidate_hash"))
+		assertCLIClass(t, state, 20, "POLICY_OR_TRANSITION", "review", "record", "--lane", "demo", "--reviewer", "reviewer", "--family", "family-b", "--seat-id", "reviewer-seat", "--source", "APPROVED; ship it", "--fingerprint", frozen.String("candidate_hash"))
 	})
 	t.Run("unrequired evidence cannot satisfy a required check", func(t *testing.T) {
 		_, state, opened := setupLane(t)
 		frozen := mustCLI(t, state, "freeze", "--lane", "demo", "--expected-hash", opened.String("hash"), "--base", "HEAD~1")
 		mustCLI(t, state, "evidence", "add", "--lane", "demo", "--method", "different-check", "--result", "pass")
-		assertCLIClass(t, state, 50, "CANDIDATE_OR_REVIEW", "review", "record", "--lane", "demo", "--reviewer", "reviewer", "--family", "family-b", "--verdict", "PASS", "--fingerprint", frozen.String("candidate_hash"))
+		assertCLIClass(t, state, 50, "CANDIDATE_OR_REVIEW", "review", "record", "--lane", "demo", "--reviewer", "reviewer", "--family", "family-b", "--seat-id", "reviewer-seat", "--verdict", "PASS", "--fingerprint", frozen.String("candidate_hash"))
 	})
 	t.Run("failed evidence cannot satisfy a required check", func(t *testing.T) {
 		_, state, opened := setupLane(t)
 		frozen := mustCLI(t, state, "freeze", "--lane", "demo", "--expected-hash", opened.String("hash"), "--base", "HEAD~1")
 		mustCLI(t, state, "evidence", "add", "--lane", "demo", "--method", "fixture-check", "--result", "fail")
-		assertCLIClass(t, state, 50, "CANDIDATE_OR_REVIEW", "review", "record", "--lane", "demo", "--reviewer", "reviewer", "--family", "family-b", "--verdict", "PASS", "--fingerprint", frozen.String("candidate_hash"))
+		assertCLIClass(t, state, 50, "CANDIDATE_OR_REVIEW", "review", "record", "--lane", "demo", "--reviewer", "reviewer", "--family", "family-b", "--seat-id", "reviewer-seat", "--verdict", "PASS", "--fingerprint", frozen.String("candidate_hash"))
 	})
 	t.Run("candidate drift after review", func(t *testing.T) {
 		repo, state, frozen, _ := setupFrozen(t)
-		mustCLI(t, state, "review", "record", "--lane", "demo", "--reviewer", "reviewer", "--family", "family-b", "--verdict", "PASS", "--fingerprint", frozen.String("candidate_hash"))
+		mustCLI(t, state, "review", "record", "--lane", "demo", "--reviewer", "reviewer", "--family", "family-b", "--seat-id", "reviewer-seat", "--verdict", "PASS", "--fingerprint", frozen.String("candidate_hash"))
 		if err := os.WriteFile(filepath.Join(repo, "drift.txt"), []byte("drift\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -103,16 +107,16 @@ func TestVerticalSliceFailureClasses(t *testing.T) {
 	})
 	t.Run("missing executable", func(t *testing.T) {
 		_, state, _ := setupLane(t)
-		assertCLIClass(t, state, 40, "TOOLING_OR_ADAPTER", "agent", "run", "--lane", "demo", "--profile", filepath.Join(t.TempDir(), "missing"), "--profile-id", "local", "--family", "family-a", "--cost-class", "economy", "--capability", "writer", "--timeout", "1s", "--output-bytes", "32")
+		assertCLIClass(t, state, 40, "TOOLING_OR_ADAPTER", "agent", "run", "--lane", "demo", "--profile", filepath.Join(t.TempDir(), "missing"), "--profile-id", "local", "--family", "family-a", "--seat-id", "writer-seat", "--cost-class", "economy", "--capability", "writer", "--timeout", "1s", "--output-bytes", "32")
 	})
 	t.Run("timeout", func(t *testing.T) {
 		_, state, _ := setupLane(t)
 		profile := fakeProfile(t)
-		assertCLIClass(t, state, 40, "TOOLING_OR_ADAPTER", "agent", "run", "--lane", "demo", "--profile", profile, "--profile-id", "local", "--family", "family-a", "--cost-class", "economy", "--capability", "writer", "--timeout", "1ms", "--output-bytes", "32", "--arg", "--sleep-ms", "--arg", "100")
+		assertCLIClass(t, state, 40, "TOOLING_OR_ADAPTER", "agent", "run", "--lane", "demo", "--profile", profile, "--profile-id", "local", "--family", "family-a", "--seat-id", "writer-seat", "--cost-class", "economy", "--capability", "writer", "--timeout", "1ms", "--output-bytes", "32", "--arg", "--sleep-ms", "--arg", "100")
 	})
 	t.Run("profile exceeds dispatch limits", func(t *testing.T) {
 		_, state, _ := setupLane(t)
-		assertCLIClass(t, state, 20, "POLICY_OR_TRANSITION", "agent", "run", "--lane", "demo", "--profile", fakeProfile(t), "--profile-id", "local", "--family", "family-a", "--cost-class", "economy", "--capability", "writer", "--timeout", "6s", "--output-bytes", "4097")
+		assertCLIClass(t, state, 20, "POLICY_OR_TRANSITION", "agent", "run", "--lane", "demo", "--profile", fakeProfile(t), "--profile-id", "local", "--family", "family-a", "--seat-id", "writer-seat", "--cost-class", "economy", "--capability", "writer", "--timeout", "6s", "--output-bytes", "4097")
 	})
 	t.Run("second writer", func(t *testing.T) {
 		repo, state, _ := setupLane(t)
@@ -121,8 +125,19 @@ func TestVerticalSliceFailureClasses(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer lease.Release()
-		assertCLIClass(t, state, 70, "CONCURRENCY", "agent", "run", "--lane", "demo", "--profile", fakeProfile(t), "--profile-id", "local", "--family", "family-a", "--cost-class", "economy", "--capability", "writer", "--timeout", "1s", "--output-bytes", "32")
+		assertCLIClass(t, state, 70, "CONCURRENCY", "agent", "run", "--lane", "demo", "--profile", fakeProfile(t), "--profile-id", "local", "--family", "family-a", "--seat-id", "writer-seat", "--cost-class", "economy", "--capability", "writer", "--timeout", "1s", "--output-bytes", "32")
 	})
+}
+
+func TestJSONFailureIncludesOperationCorrection(t *testing.T) {
+	_, state, frozen, _ := setupFrozen(t)
+	code, result, _ := runJSON(t, "review", "record", "--lane", "demo", "--reviewer", "reviewer", "--family", "family-a", "--seat-id", "reviewer-seat", "--verdict", "PASS", "--fingerprint", frozen.String("candidate_hash"), "--state", state)
+	if code != 20 || result["class"] != "POLICY_OR_TRANSITION" {
+		t.Fatalf("review failure: %d %#v", code, result)
+	}
+	if result["correction"] != "set --family on review record to a value different from the dispatch family used by the writer" {
+		t.Fatalf("correction: %#v", result["correction"])
+	}
 }
 
 func setupLane(t *testing.T) (string, string, cliResult) {
@@ -130,7 +145,7 @@ func setupLane(t *testing.T) (string, string, cliResult) {
 	repo := newCleanGitFixture(t)
 	state := t.TempDir()
 	mustCLI(t, state, "init", "--workspace", repo)
-	opened := mustCLI(t, state, "lane", "open", "--id", "demo", "--workspace", repo, "--writer", "writer-1", "--family", "family-a", "--source-control", "git", "--adapter", "local", "--cost-class", "economy", "--allowed-paths", "cmd", "--forbidden-paths", "none", "--non-goals", "deploy", "--required-checks", "fixture-check", "--review-policy", "independent", "--max-seconds", "5", "--max-output-bytes", "4096", "--max-memory-bytes", "0")
+	opened := mustCLI(t, state, "lane", "open", "--id", "demo", "--workspace", repo, "--writer", "writer-1", "--family", "family-a", "--seat-id", "writer-seat", "--source-control", "git", "--adapter", "local", "--cost-class", "economy", "--allowed-paths", "cmd", "--forbidden-paths", "none", "--non-goals", "deploy", "--required-checks", "fixture-check", "--review-policy", "independent", "--max-seconds", "5", "--max-output-bytes", "4096", "--max-memory-bytes", "0")
 	return repo, state, opened
 }
 

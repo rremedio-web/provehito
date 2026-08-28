@@ -14,6 +14,7 @@ import (
 // FamilyPolicy controls the independent-family requirement.
 type FamilyPolicy struct {
 	WriterFamily       string
+	WriterSeatID       string
 	RequireIndependent bool
 }
 
@@ -52,6 +53,9 @@ func (r *Readiness) Evaluate(input Input) (ReadyRecord, error) {
 	writerFamily, independent := input.Family.WriterFamily, input.Family.RequireIndependent
 	if independent && (writerFamily == "" || input.Review.ReviewerFamily == "" || writerFamily == input.Review.ReviewerFamily) {
 		return ReadyRecord{}, failure.New(failure.PolicyOrTransition, "readiness reviewer family")
+	}
+	if independent && (input.Family.WriterSeatID == "" || input.Review.ReviewerSeatID == "" || input.Family.WriterSeatID == input.Review.ReviewerSeatID) {
+		return ReadyRecord{}, failure.New(failure.PolicyOrTransition, "readiness reviewer seat")
 	}
 	if input.Review.Verdict == "" {
 		return ReadyRecord{}, failure.New(failure.PolicyOrTransition, "readiness explicit verdict")

@@ -654,7 +654,7 @@ func fixtureManifest(state lifecycle.State) manifest.Manifest {
 		m.Freeze = &manifest.FreezeRecord{Base: "base", Head: "head", Candidate: "candidate", Tree: "tree", Diff: "diff", At: fixedTimestamp()}
 	}
 	if state == lifecycle.Reviewed || state == lifecycle.Ready || state == lifecycle.Closed {
-		m.Review = &manifest.ReviewRecord{Reviewer: "reviewer", Family: "independent", Verdict: "PASS", Fingerprint: "candidate", EvidenceHashes: []string{strings.Repeat("e", 64)}, At: fixedTimestamp()}
+		m.Review = &manifest.ReviewRecord{Reviewer: "reviewer", Family: "independent", SeatID: "reviewer-seat", Verdict: "PASS", Fingerprint: "candidate", EvidenceHashes: []string{strings.Repeat("e", 64)}, At: fixedTimestamp()}
 	}
 	return m
 }
@@ -666,6 +666,7 @@ func fixtureDispatch() manifest.Dispatch {
 		Writer:         "writer",
 		Adapter:        "fake",
 		Family:         "local",
+		SeatID:         "writer-seat",
 		CostClass:      "economy",
 		AllowedPaths:   []string{"core"},
 		ForbiddenPaths: []string{},

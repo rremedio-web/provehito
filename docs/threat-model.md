@@ -70,3 +70,9 @@ Phase 1 does not provide remote or multi-user isolation, credential storage,
 network transport, a background service, automatic cleanup, or external-action
 execution. These are separate future scopes and must receive their own threat
 models.
+
+Reviewer-family strings and seat IDs are operator-declared, not authenticated.
+The manifest, review record, and agent-run receipt persist seat IDs, and
+independent readiness rejects a reviewer seat equal to the writer seat. A
+malicious same-user process can still spoof a seat ID; stronger process
+authentication requires an operator-supplied OS sandbox.

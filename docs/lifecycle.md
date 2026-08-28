@@ -39,7 +39,8 @@ also the source state recorded when a planned lane is blocked.
 | `lane incident` | Any non-terminal state -> `INCIDENT` |
 
 `lane validate` and `lane status` read the manifest and current hash; they do
-not transition it. Every mutation uses an expected prior hash where the
+not transition it. `lane list` reads all canonical lane manifests and returns
+sorted current-state rows without creating a persisted index. Every mutation uses an expected prior hash where the
 command exposes one, so a stale operator cannot silently overwrite a newer
 manifest. An undeclared transition fails with `POLICY_OR_TRANSITION` (exit
 20).
@@ -51,8 +52,11 @@ dispatch hash, and time. A dirty workspace, untracked file, unsupported Git
 output, or later candidate drift prevents the next gate from passing.
 
 Review is about those frozen bytes, not a branch name or a prose claim. An
-independent-family policy requires the reviewer family to differ from the
-writer family. Agent output containing words such as “approved” has no effect.
+independent-family policy requires the reviewer family and seat ID to differ
+from the writer family and seat ID. Seat IDs are operator/orchestrator-declared
+identifiers: they make separation explicit within the manifest, but do not
+authenticate the host process. Agent output containing words such as “approved”
+has no effect.
 
 ## Blocking and terminal states
 

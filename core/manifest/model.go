@@ -39,6 +39,7 @@ type Dispatch struct {
 	Writer         string   `json:"writer"`
 	Adapter        string   `json:"adapter"`
 	Family         string   `json:"family"`
+	SeatID         string   `json:"seat_id"`
 	CostClass      string   `json:"cost_class"`
 	AllowedPaths   []string `json:"allowed_paths"`
 	ForbiddenPaths []string `json:"forbidden_paths"`
@@ -64,6 +65,7 @@ type FreezeRecord struct {
 type ReviewRecord struct {
 	Reviewer       string   `json:"reviewer"`
 	Family         string   `json:"family"`
+	SeatID         string   `json:"seat_id"`
 	Verdict        string   `json:"verdict"`
 	Fingerprint    string   `json:"fingerprint"`
 	EvidenceHashes []string `json:"evidence_hashes"`
@@ -239,7 +241,7 @@ func decode(data []byte) (Manifest, string, error) {
 
 func validate(m Manifest) error {
 	if m.SchemaVersion != 1 || m.LaneID == "" || m.Dispatch.Workspace == "" || m.Dispatch.SourceControl == "" ||
-		m.Dispatch.Writer == "" || m.Dispatch.Adapter == "" || m.Dispatch.Family == "" || m.Dispatch.CostClass == "" ||
+		m.Dispatch.Writer == "" || m.Dispatch.Adapter == "" || m.Dispatch.Family == "" || m.Dispatch.SeatID == "" || m.Dispatch.CostClass == "" ||
 		m.Dispatch.ReviewPolicy == "" || m.Dispatch.AllowedPaths == nil || m.Dispatch.ForbiddenPaths == nil ||
 		m.Dispatch.NonGoals == nil || m.Dispatch.RequiredChecks == nil || m.State == "" || m.CreatedAt == "" ||
 		m.UpdatedAt == "" || !m.ExternalActionsHumanOnly {
@@ -271,7 +273,7 @@ func validate(m Manifest) error {
 		return failure.New(failure.UsageOrSchema, "manifest freeze required")
 	}
 	if m.Review != nil {
-		if m.Review.Reviewer == "" || m.Review.Family == "" || m.Review.Verdict == "" || m.Review.Fingerprint == "" || m.Review.At == "" || !validHashSet(m.Review.EvidenceHashes) {
+		if m.Review.Reviewer == "" || m.Review.Family == "" || m.Review.SeatID == "" || m.Review.Verdict == "" || m.Review.Fingerprint == "" || m.Review.At == "" || !validHashSet(m.Review.EvidenceHashes) {
 			return failure.New(failure.UsageOrSchema, "manifest review required")
 		}
 		if (m.Review.Verdict != "PASS" && m.Review.Verdict != "FAIL") || !isCanonicalTimestamp(m.Review.At) ||

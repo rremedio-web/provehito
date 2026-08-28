@@ -25,7 +25,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	if len(args) == 0 || args[0] == "help" {
 		if len(args) == 1 && args[0] == "help" {
-			fmt.Fprintln(stdout, "usage: provehito init|doctor|lane <open|validate|status|block|resume|abandon|incident>")
+			fmt.Fprintln(stdout, "usage: provehito init|doctor|lane <open|list|validate|status|block|resume|abandon|incident>")
 			return 0
 		}
 		return writeResult(stdout, stderr, "", jsonRequested(args), nil, usageError("missing command"))

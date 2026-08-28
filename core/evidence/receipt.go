@@ -60,6 +60,7 @@ type Receipt struct {
 	Candidate     fingerprint.Fingerprint `json:"-"`
 	SchemaVersion int                     `json:"schema_version"`
 	MethodID      string                  `json:"method_id"`
+	SeatID        string                  `json:"seat_id,omitempty"`
 	Probe         string                  `json:"probe"`
 	CandidateHash string                  `json:"candidate_hash"`
 	ManifestHash  string                  `json:"manifest_hash"`
@@ -73,6 +74,7 @@ type Receipt struct {
 type receiptPayload struct {
 	SchemaVersion int         `json:"schema_version"`
 	MethodID      string      `json:"method_id"`
+	SeatID        string      `json:"seat_id,omitempty"`
 	Probe         string      `json:"probe"`
 	CandidateHash string      `json:"candidate_hash"`
 	ManifestHash  string      `json:"manifest_hash"`
@@ -86,6 +88,7 @@ func (r Receipt) payload() receiptPayload {
 	return receiptPayload{
 		SchemaVersion: r.SchemaVersion,
 		MethodID:      r.MethodID,
+		SeatID:        r.SeatID,
 		Probe:         r.Probe,
 		CandidateHash: r.CandidateHash,
 		ManifestHash:  r.ManifestHash,
@@ -124,6 +127,9 @@ func (r Receipt) validateInput() error {
 	if r.SchemaVersion != 1 || r.MethodID == "" || len(r.MethodID) > maxMethodID || hasControl(r.MethodID) ||
 		r.Probe == "" || len(r.Probe) > maxProbeID || hasControl(r.Probe) || !isHash(r.CandidateHash) || !isHash(r.ManifestHash) {
 		return fmt.Errorf("receipt required fields")
+	}
+	if len(r.SeatID) > maxMethodID || hasControl(r.SeatID) {
+		return fmt.Errorf("receipt seat id")
 	}
 	if len(r.Artifacts) > maxArtifact || len(r.Artifacts) == 0 && r.Artifacts != nil {
 		return fmt.Errorf("receipt artifact presence")

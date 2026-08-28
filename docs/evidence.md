@@ -48,7 +48,9 @@ content-addressed receipt; tampering is an `INTEGRITY` failure (exit 60).
 
 `agent run` creates and returns an `agent-run` receipt whose probe records exit
 status, duration, truncation flags, and stdout/stderr SHA-256 hashes. Receipt
-artifact references name `stdout` and `stderr` with those hashes. Provehito does
+artifact references name `stdout` and `stderr` with those hashes. Pass the
+writer seat with `--seat-id` or `PROVEHITO_SEAT_ID`; it must match the lane
+dispatch seat and is persisted in the receipt. Provehito does
 not automatically persist subprocess output as plaintext. CLI JSON for `agent
 run` returns the same hashes and flags, never raw child bytes. It does not
 attach that receipt to the lane's required evidence. Add each declared required
@@ -72,7 +74,7 @@ the returned candidate hash:
 ```bash
 provehito review record \
   --state "$STATE" --lane demo --reviewer reviewer-1 \
-  --family family-b --verdict PASS \
+  --family family-b --seat-id reviewer-seat --verdict PASS \
   --fingerprint "$CANDIDATE_HASH" --json
 ```
 

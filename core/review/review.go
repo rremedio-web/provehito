@@ -22,6 +22,7 @@ const (
 type Record struct {
 	ReviewerID              string
 	ReviewerFamily          string
+	ReviewerSeatID          string
 	Verdict                 Verdict
 	CandidateEquivalentHash string
 	ManifestHash            string
@@ -31,7 +32,7 @@ type Record struct {
 
 // Validate checks the review's explicit identity and decision against freeze.
 func Validate(frozen fingerprint.Fingerprint, record Record) error {
-	if record.ReviewerID == "" || record.ReviewerFamily == "" ||
+	if record.ReviewerID == "" || record.ReviewerFamily == "" || record.ReviewerSeatID == "" ||
 		(record.Verdict != Pass && record.Verdict != Fail) ||
 		record.CandidateEquivalentHash == "" || frozen.EquivalentHash == "" ||
 		record.ManifestHash == "" || frozen.ManifestHash == "" ||

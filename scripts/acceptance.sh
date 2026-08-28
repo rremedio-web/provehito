@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
+export GOCACHE="$repo_root/.gocache"
 
 test -z "$(gofmt -l .)"
 go vet ./...

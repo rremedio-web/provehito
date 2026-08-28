@@ -12,11 +12,12 @@ import (
 // result is deliberately a fixed-shape envelope. Field order is part of the
 // CLI's deterministic JSON surface.
 type result struct {
-	OK      bool   `json:"ok"`
-	Command string `json:"command"`
-	Class   string `json:"class"`
-	Message string `json:"message"`
-	Data    any    `json:"data"`
+	OK         bool   `json:"ok"`
+	Command    string `json:"command"`
+	Class      string `json:"class"`
+	Message    string `json:"message"`
+	Correction string `json:"correction,omitempty"`
+	Data       any    `json:"data"`
 }
 
 func writeResult(stdout, stderr io.Writer, command string, jsonOutput bool, data any, err error) int {
@@ -39,12 +40,12 @@ func writeResult(stdout, stderr io.Writer, command string, jsonOutput bool, data
 	if message == "" {
 		message = "command failed"
 	}
-	r := result{OK: false, Command: command, Class: string(class), Message: message, Data: data}
+	r := result{OK: false, Command: command, Class: string(class), Message: message, Correction: correctionFor(class, operation), Data: data}
 	if jsonOutput {
 		_ = json.NewEncoder(stdout).Encode(r)
 	} else {
 		fmt.Fprintf(stdout, "RESULT: ERROR %s [%s]\n", command, class)
-		fmt.Fprintf(stdout, "Correction: %s\n", correctionFor(class))
+		fmt.Fprintf(stdout, "Correction: %s\n", correctionFor(class, operation))
 	}
 	_ = stderr
 	return failure.ExitCodeFor(err)
@@ -58,7 +59,15 @@ func errorDetails(err error) (failure.Class, string) {
 	return failure.UsageOrSchema, "invalid command input"
 }
 
-func correctionFor(class failure.Class) string {
+func correctionFor(class failure.Class, operation string) string {
+	switch operation {
+	case "review reviewer family", "readiness reviewer family":
+		return "set --family on review record to a value different from the dispatch family used by the writer"
+	case "review reviewer seat", "readiness reviewer seat":
+		return "set --seat-id on review record to a seat different from the writer seat"
+	case "agent writer seat":
+		return "set --seat-id or PROVEHITO_SEAT_ID to the writer seat declared by lane open"
+	}
 	switch class {
 	case failure.Integrity:
 		return "inspect the state root and correct the integrity failure"
