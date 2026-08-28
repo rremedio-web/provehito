@@ -357,13 +357,30 @@ func TestSecurityWorkflowPinsAndPermissions(t *testing.T) {
 		t.Fatal("security-events write should be scoped to codeql job")
 	}
 	codeqlSection := content[strings.Index(content, "codeql:"):]
+	if end := strings.Index(codeqlSection, "\n  gitleaks:"); end >= 0 {
+		codeqlSection = codeqlSection[:end]
+	}
 	if !strings.Contains(codeqlSection, "security-events: write") {
 		t.Fatal("codeql job must grant security-events: write")
+	}
+	if !strings.Contains(codeqlSection, "- name: Set up Go") || !strings.Contains(codeqlSection, `go-version: "1.26.7"`) {
+		t.Fatal("codeql job must use the repository Go toolchain")
 	}
 	if strings.Count(content, "security-events: write") != 1 {
 		t.Fatalf("security-events: write should appear once, got %d", strings.Count(content, "security-events: write"))
 	}
 	if strings.Contains(content, "comment: false") {
 		t.Fatal("gitleaks comment input is unsupported; use GITLEAKS_ENABLE_COMMENTS")
+	}
+}
+
+func TestCIAcceptanceMatrixDoesNotCancelSiblingEvidence(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "strategy:\n      fail-fast: false") {
+		t.Fatal("acceptance matrix must retain sibling results after one OS fails")
 	}
 }

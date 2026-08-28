@@ -306,6 +306,27 @@ func TestLaneListReturnsSortedCurrentStateWithoutWriting(t *testing.T) {
 	}
 }
 
+func TestLaneListRejectsManifestWithUnsafeFilename(t *testing.T) {
+	state := filepath.Join(t.TempDir(), "runtime")
+	workspace := t.TempDir()
+	if code := Run([]string{"init", "--state", state, "--workspace", workspace}, &bytes.Buffer{}, &bytes.Buffer{}); code != 0 {
+		t.Fatalf("init: %d", code)
+	}
+	mustCLI(t, state, completeOpenArgs(state, "valid", workspace)...)
+	validPath := filepath.Join(state, "lanes", "valid.json")
+	data, err := os.ReadFile(validPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(state, "lanes", "unexpected_lane.json"), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	code, result, _ := runJSON(t, "lane", "list", "--state", state)
+	if code != 60 || result["class"] != "INTEGRITY" {
+		t.Fatalf("unsafe filename accepted: %d %#v", code, result)
+	}
+}
+
 func TestDoctorIsReadOnlyAndHumanOutputStartsWithResult(t *testing.T) {
 	stateParent := t.TempDir()
 	state := filepath.Join(stateParent, "runtime")

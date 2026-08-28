@@ -320,7 +320,11 @@ func runLaneList(args []string, stdout, stderr io.Writer) int {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
 		}
-		m, _, err := manifest.NewStore(filepath.Join(laneDir, entry.Name()), clock.System{}).Load()
+		path, err := laneEntryPath(*state, entry.Name())
+		if err != nil {
+			return writeResult(stdout, stderr, "lane list", *jsonOutput, nil, err)
+		}
+		m, _, err := manifest.NewStore(path, clock.System{}).Load()
 		if err != nil {
 			return writeResult(stdout, stderr, "lane list", *jsonOutput, nil, err)
 		}
@@ -328,6 +332,17 @@ func runLaneList(args []string, stdout, stderr io.Writer) int {
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].LaneID < rows[j].LaneID })
 	return writeResult(stdout, stderr, "lane list", *jsonOutput, map[string]any{"lanes": rows}, nil)
+}
+
+func laneEntryPath(state, name string) (string, error) {
+	if filepath.Base(name) != name || !strings.HasSuffix(name, ".json") {
+		return "", failure.New(failure.Integrity, "lane manifest filename")
+	}
+	id := strings.TrimSuffix(name, ".json")
+	if !laneIDPattern.MatchString(id) {
+		return "", failure.New(failure.Integrity, "lane manifest filename")
+	}
+	return lanePath(state, id)
 }
 
 func runLaneRead(operation string, args []string, stdout, stderr io.Writer) int {
