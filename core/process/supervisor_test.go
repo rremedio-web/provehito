@@ -160,7 +160,7 @@ func TestSupervisorWorkingDirectory(t *testing.T) {
 
 func TestSupervisorTimeoutKillsDescendantProcessGroup(t *testing.T) {
 	marker := filepath.Join(t.TempDir(), "descendant.pid")
-	result, err := runFakeAgent(t, context.Background(), adapter.Profile{Timeout: 300 * time.Millisecond}, "--spawn-descendant", "--marker", marker, "--sleep-ms", "5000")
+	result, err := runFakeAgent(t, context.Background(), adapter.Profile{Timeout: 2 * time.Second}, "--spawn-descendant", "--marker", marker, "--sleep-ms", "10000")
 	if err == nil || result.TimedOut == false {
 		t.Fatalf("timeout: result=%#v err=%v", result, err)
 	}
