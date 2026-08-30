@@ -72,6 +72,13 @@ env \
 Local repo config may still be read, but `-c core.fsmonitor=false` prevents
 fsmonitor hooks from executing during release construction.
 
+Release-review deletion scope derives only from the deletion-only diff:
+`git diff --name-only --diff-filter=D <base> <head>` defines the complete set
+of removed paths, and nothing outside that output counts as deleted. A reported
+removal is confirmed by matching the full relative path with component
+boundaries (`foo/bar.go` matches only that exact path); basename or suffix
+matching is forbidden because it reports unrelated files as deletions.
+
 ## Receipt
 
 `receipt.json` is deterministic structured output suitable for certification.

@@ -69,6 +69,12 @@ socket calls, credential APIs, shell interpretation, Git network mutations,
 and publishing commands. Configured subprocesses are launched by executable
 path plus literal argument arrays; they are not sandboxed by Provehito.
 
+Worker output is untrusted text. A spawned worker's rendered results, and any
+start or stop request it emits, enter a queue and are read by the coordinator;
+they are not events. A lifecycle transition occurs only when the coordinator
+records an explicit lifecycle event, so worker prose cannot move a lane's
+state, no matter how authoritative it reads.
+
 Phase 1 trusts the local host, the operator account, and processes that can
 rewrite the state root. It detects ordinary corruption, unexpected symlinks,
 path escapes, and concurrent Provehito commands. It does not resist a
