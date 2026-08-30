@@ -59,9 +59,7 @@ func runEvidence(operation string, args []string, stdout, stderr interface{ Writ
 		}
 	}
 	reference := manifestEvidence(*method, receipt.Hash)
-	_, newHash, err := store.Mutate(manifest.ExpectedHash{}, func(next *manifest.Manifest) {
-		next.Evidence = append(next.Evidence, reference)
-	})
+	_, newHash, err := store.AddEvidence(reference)
 	if err != nil {
 		return writeResult(stdout, stderr, "evidence add", *jsonOutput, nil, err)
 	}

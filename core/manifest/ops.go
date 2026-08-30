@@ -82,3 +82,22 @@ func (s Store) Mutate(expected ExpectedHash, mutate func(*Manifest)) (Manifest, 
 	}
 	return m, newHash, nil
 }
+
+// RecordFreeze applies the freeze transition and records the candidate
+// fingerprints bound to it, under expected.
+func (s Store) RecordFreeze(expected ExpectedHash, record FreezeRecord) (Manifest, string, error) {
+	return s.Apply(expected, lifecycle.Freeze, func(m *Manifest) { m.Freeze = &record })
+}
+
+// RecordReview applies the record-review transition and records the review
+// verdict bound to it.
+func (s Store) RecordReview(record ReviewRecord) (Manifest, string, error) {
+	return s.Apply(ExpectedHash{}, lifecycle.RecordReview, func(m *Manifest) { m.Review = &record })
+}
+
+// AddEvidence appends one evidence reference to the frozen lane without a
+// lifecycle transition. The caller owns duplicate detection and receipt
+// installation.
+func (s Store) AddEvidence(reference EvidenceReference) (Manifest, string, error) {
+	return s.Mutate(ExpectedHash{}, func(m *Manifest) { m.Evidence = append(m.Evidence, reference) })
+}

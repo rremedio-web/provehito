@@ -33,9 +33,7 @@ func runFreeze(args []string, stdout, stderr interface{ Write([]byte) (int, erro
 		return writeResult(stdout, stderr, "freeze", *jsonOutput, nil, err)
 	}
 	record := manifest.FreezeRecord{Base: fp.BaseCommit, Head: fp.HeadCommit, Candidate: fp.EquivalentHash, Tree: fp.HeadTree, Diff: fp.DiffHash, At: fp.FrozenAt.UTC().Format("2006-01-02T15:04:05Z")}
-	m, newHash, err := store.Apply(manifest.OptionalHash(*expected, "freeze"), lifecycle.Freeze, func(next *manifest.Manifest) {
-		next.Freeze = &record
-	})
+	m, newHash, err := store.RecordFreeze(manifest.OptionalHash(*expected, "freeze"), record)
 	if err != nil {
 		return writeResult(stdout, stderr, "freeze", *jsonOutput, nil, err)
 	}

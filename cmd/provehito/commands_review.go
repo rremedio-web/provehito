@@ -100,9 +100,7 @@ func runReviewRecord(args []string, stdout, stderr interface{ Write([]byte) (int
 		// Source text is deliberately not copied into the authority-bearing model.
 		_ = source
 	}
-	_, newHash, err := store.Apply(manifest.ExpectedHash{}, lifecycle.RecordReview, func(next *manifest.Manifest) {
-		next.Review = &record
-	})
+	_, newHash, err := store.RecordReview(record)
 	if err != nil {
 		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, err)
 	}

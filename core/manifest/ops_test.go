@@ -97,6 +97,52 @@ func TestMutateLeavesTheLifecycleSnapshotUntouched(t *testing.T) {
 	}
 }
 
+func TestNamedOperationsRecordBoundFields(t *testing.T) {
+	s := manifest.NewStore(filepath.Join(t.TempDir(), "demo.json"), clock.Fixed{Time: fixedTime()})
+	hash, err := s.Create(fixtureManifest(lifecycle.Active))
+	if err != nil {
+		t.Fatal(err)
+	}
+	freeze := manifest.FreezeRecord{Base: "base", Head: "head", Candidate: "candidate", Tree: "tree", Diff: "diff", At: fixedTimestamp()}
+	frozen, _, err := s.RecordFreeze(manifest.ExpectedHash{}, freeze)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if frozen.State != lifecycle.Frozen || frozen.Freeze == nil || frozen.Freeze.Candidate != "candidate" {
+		t.Fatalf("RecordFreeze: %#v", frozen)
+	}
+	review := manifest.ReviewRecord{Reviewer: "reviewer", Family: "independent", SeatID: "reviewer-seat", Verdict: "PASS", Fingerprint: "candidate", EvidenceHashes: []string{opHash("e")}, At: fixedTimestamp()}
+	reviewed, _, err := s.RecordReview(review)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reviewed.State != lifecycle.Reviewed || reviewed.Review == nil || reviewed.Review.Verdict != "PASS" {
+		t.Fatalf("RecordReview: %#v", reviewed)
+	}
+	_ = hash
+}
+
+func TestAddEvidenceAppendsWithoutTransition(t *testing.T) {
+	s := manifest.NewStore(filepath.Join(t.TempDir(), "demo.json"), clock.Fixed{Time: fixedTime()})
+	if _, err := s.Create(fixtureManifest(lifecycle.Frozen)); err != nil {
+		t.Fatal(err)
+	}
+	added, _, err := s.AddEvidence(manifest.EvidenceReference{Name: "check-2", Hash: opHash("b")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if added.State != lifecycle.Frozen || len(added.Evidence) != 2 || added.Evidence[1].Name != "check-2" {
+		t.Fatalf("AddEvidence: %#v", added)
+	}
+	stored, _, err := s.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.State != lifecycle.Frozen || len(stored.Evidence) != 2 {
+		t.Fatalf("stored AddEvidence: %#v", stored)
+	}
+}
+
 func TestApplyHashExpectationPolicies(t *testing.T) {
 	t.Run("required empty", func(t *testing.T) {
 		s, _ := newBlockedLane(t)
