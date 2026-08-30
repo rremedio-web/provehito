@@ -44,6 +44,12 @@ type Result struct {
 	Signaled        bool
 }
 
+// Runner runs one supervised foreground process. Supervisor is the
+// production os/exec adapter; tests supply an in-memory runner.
+type Runner interface {
+	Run(context.Context, Request) (Result, error)
+}
+
 // Supervisor is a stateless foreground process supervisor.
 type Supervisor struct{}
 
@@ -72,7 +78,7 @@ func (s *Supervisor) Run(ctx context.Context, request Request) (Result, error) {
 	command.Stderr = stderr
 	started := time.Now()
 	if err := command.Start(); err != nil {
-		empty := emptyStreamHash()
+		empty := EmptyStreamHash()
 		return Result{
 			ExitCode:   -1,
 			Duration:   time.Since(started),
@@ -264,6 +270,8 @@ func (w *boundedWriter) Hash() string {
 
 func (w *boundedWriter) Truncated() bool { return w.truncated }
 
-func emptyStreamHash() string {
+// EmptyStreamHash is the content hash of the empty stream. It is the one
+// definition; callers use it for missing stream evidence.
+func EmptyStreamHash() string {
 	return hex.EncodeToString(sha256.New().Sum(nil))
 }

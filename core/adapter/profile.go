@@ -25,11 +25,48 @@ type Profile struct {
 	OutputLimit      int64
 }
 
-// Requirement describes the capability and optional family exclusion needed
-// by a launch.
-type Requirement struct {
-	Capability     string
-	ExcludedFamily string
+// CostRankFor maps a dispatch cost-class vocabulary to a cost rank. The
+// second return reports whether the class is declared.
+func CostRankFor(class string) (int, bool) {
+	switch strings.ToLower(class) {
+	case "economy", "cheap", "low":
+		return 0, true
+	case "standard", "medium":
+		return 1, true
+	case "premium", "high":
+		return 2, true
+	default:
+		return 0, false
+	}
+}
+
+// DispatchEnvelope is the identity and resource envelope a dispatch grants
+// one agent run.
+type DispatchEnvelope struct {
+	Adapter        string
+	Family         string
+	MaxSeconds     int64
+	MaxOutputBytes int64
+	CostClass      string
+}
+
+// ValidateDispatch checks that a launch profile fits the dispatch envelope:
+// the profile identity matches the dispatch adapter and family, the profile
+// timeout and output limit stay inside the dispatch limits (including
+// sub-second rounding), and the declared cost class equals the dispatch's.
+func ValidateDispatch(profile Profile, declaredClass string, envelope DispatchEnvelope) error {
+	if profile.ID != envelope.Adapter || profile.Family != envelope.Family {
+		return failure.New(failure.PolicyOrTransition, "agent profile dispatch mismatch")
+	}
+	wholeSeconds, fractional := profile.Timeout/time.Second, profile.Timeout%time.Second
+	if envelope.MaxSeconds <= 0 || int64(wholeSeconds) > envelope.MaxSeconds || int64(wholeSeconds) == envelope.MaxSeconds && fractional > 0 ||
+		envelope.MaxOutputBytes <= 0 || profile.OutputLimit > envelope.MaxOutputBytes {
+		return failure.New(failure.PolicyOrTransition, "agent profile exceeds dispatch limits")
+	}
+	if declaredClass != envelope.CostClass {
+		return failure.New(failure.PolicyOrTransition, "agent cost class mismatch")
+	}
+	return nil
 }
 
 // Validate checks every launch-profile field and rejects ambiguous values.
@@ -114,13 +151,4 @@ func validEnvironmentName(name string) bool {
 		}
 	}
 	return true
-}
-
-func hasCapability(profile Profile, capability string) bool {
-	for _, candidate := range profile.Capabilities {
-		if candidate == capability {
-			return true
-		}
-	}
-	return false
 }
