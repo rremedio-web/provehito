@@ -107,62 +107,25 @@ func ValidateUpdate(expectedHash string, before, after Manifest) error {
 	if before.CreatedAt != after.CreatedAt {
 		return failure.New(failure.PolicyOrTransition, "manifest created timestamp immutable")
 	}
-	if (isAtOrAfterActive(before) || isAtOrAfterActive(after)) && !reflect.DeepEqual(before.Dispatch, after.Dispatch) {
+	if (lifecycle.AtOrAfterActive(laneSnapshot(before)) || lifecycle.AtOrAfterActive(laneSnapshot(after))) && !reflect.DeepEqual(before.Dispatch, after.Dispatch) {
 		return failure.New(failure.PolicyOrTransition, "manifest dispatch immutable")
 	}
-	if (isAtOrAfterActive(before) || isAtOrAfterActive(after)) && before.DispatchHash != after.DispatchHash {
+	if (lifecycle.AtOrAfterActive(laneSnapshot(before)) || lifecycle.AtOrAfterActive(laneSnapshot(after))) && before.DispatchHash != after.DispatchHash {
 		return failure.New(failure.PolicyOrTransition, "manifest dispatch hash immutable")
 	}
-	if isAtOrAfterFrozen(before) && !reflect.DeepEqual(before.Freeze, after.Freeze) {
+	if lifecycle.AtOrAfterFrozen(laneSnapshot(before)) && !reflect.DeepEqual(before.Freeze, after.Freeze) {
 		return failure.New(failure.PolicyOrTransition, "manifest freeze immutable")
 	}
-	if isAtOrAfterReviewed(before) && !reflect.DeepEqual(before.Review, after.Review) {
+	if lifecycle.AtOrAfterReviewed(laneSnapshot(before)) && !reflect.DeepEqual(before.Review, after.Review) {
 		return failure.New(failure.PolicyOrTransition, "manifest review immutable")
 	}
 	return nil
 }
 
-func isAtOrAfterActive(m Manifest) bool {
-	return m.State == lifecycle.Active || isAtOrAfterFrozen(m) || isAtOrAfterReviewed(m) ||
-		m.State == lifecycle.Ready || m.State == lifecycle.Closed ||
-		(m.State == lifecycle.Blocked && isAtOrAfterActiveState(m.BlockedFrom))
-}
-
-func isAtOrAfterActiveState(state lifecycle.State) bool {
-	switch state {
-	case lifecycle.Active, lifecycle.Frozen, lifecycle.Reviewed, lifecycle.Ready, lifecycle.Closed:
-		return true
-	default:
-		return false
-	}
-}
-
-func isAtOrAfterFrozen(m Manifest) bool {
-	return m.State == lifecycle.Frozen || isAtOrAfterReviewed(m) || m.State == lifecycle.Ready || m.State == lifecycle.Closed ||
-		(m.State == lifecycle.Blocked && isAtOrAfterFrozenState(m.BlockedFrom))
-}
-
-func isAtOrAfterFrozenState(state lifecycle.State) bool {
-	switch state {
-	case lifecycle.Frozen, lifecycle.Reviewed, lifecycle.Ready, lifecycle.Closed:
-		return true
-	default:
-		return false
-	}
-}
-
-func isAtOrAfterReviewed(m Manifest) bool {
-	return m.State == lifecycle.Reviewed || m.State == lifecycle.Ready || m.State == lifecycle.Closed ||
-		(m.State == lifecycle.Blocked && isAtOrAfterReviewedState(m.BlockedFrom))
-}
-
-func isAtOrAfterReviewedState(state lifecycle.State) bool {
-	switch state {
-	case lifecycle.Reviewed, lifecycle.Ready, lifecycle.Closed:
-		return true
-	default:
-		return false
-	}
+// laneSnapshot projects the manifest's lifecycle fields onto the lifecycle
+// package's own snapshot shape, so ordering is decided by lifecycle alone.
+func laneSnapshot(m Manifest) lifecycle.Snapshot {
+	return lifecycle.Snapshot{State: m.State, BlockedFrom: m.BlockedFrom}
 }
 
 func dispatchHash(d Dispatch) (string, error) {
@@ -250,7 +213,7 @@ func validate(m Manifest) error {
 	if !isCanonicalTimestamp(m.CreatedAt) || !isCanonicalTimestamp(m.UpdatedAt) {
 		return failure.New(failure.UsageOrSchema, "manifest timestamps")
 	}
-	if !isKnownState(m.State) || (m.State == lifecycle.Blocked && !isBlockedFromState(m.BlockedFrom)) ||
+	if !lifecycle.KnownState(m.State) || (m.State == lifecycle.Blocked && !lifecycle.BlockableFrom(m.BlockedFrom)) ||
 		(m.State != lifecycle.Blocked && m.BlockedFrom != "") {
 		return failure.New(failure.UsageOrSchema, "manifest lifecycle state")
 	}
@@ -269,7 +232,7 @@ func validate(m Manifest) error {
 			return failure.New(failure.UsageOrSchema, "manifest freeze timestamp")
 		}
 	}
-	if (m.State == lifecycle.Frozen || isAtOrAfterFrozen(m)) && m.Freeze == nil {
+	if lifecycle.AtOrAfterFrozen(laneSnapshot(m)) && m.Freeze == nil {
 		return failure.New(failure.UsageOrSchema, "manifest freeze required")
 	}
 	if m.Review != nil {
@@ -281,7 +244,7 @@ func validate(m Manifest) error {
 			return failure.New(failure.UsageOrSchema, "manifest review binding")
 		}
 	}
-	if (m.State == lifecycle.Reviewed || isAtOrAfterReviewed(m)) && m.Review == nil {
+	if lifecycle.AtOrAfterReviewed(laneSnapshot(m)) && m.Review == nil {
 		return failure.New(failure.UsageOrSchema, "manifest review required")
 	}
 	for _, evidence := range m.Evidence {
@@ -380,25 +343,6 @@ func cloneFailures(values []FailureRecord) []FailureRecord {
 	cloned := make([]FailureRecord, len(values))
 	copy(cloned, values)
 	return cloned
-}
-
-func isKnownState(state lifecycle.State) bool {
-	switch state {
-	case lifecycle.Planned, lifecycle.Active, lifecycle.Frozen, lifecycle.Reviewed, lifecycle.Ready,
-		lifecycle.Closed, lifecycle.Blocked, lifecycle.Abandoned, lifecycle.Incident:
-		return true
-	default:
-		return false
-	}
-}
-
-func isBlockedFromState(state lifecycle.State) bool {
-	switch state {
-	case lifecycle.Planned, lifecycle.Active, lifecycle.Frozen, lifecycle.Reviewed, lifecycle.Ready:
-		return true
-	default:
-		return false
-	}
 }
 
 func validHashSet(values []string) bool {

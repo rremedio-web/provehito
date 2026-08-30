@@ -128,13 +128,8 @@ func runAgent(args []string, stdout, stderr interface{ Write([]byte) (int, error
 	}
 	manager := workspace.NewLeaseManager(*state)
 	if abandoned := manager.DetectAbandoned(m.Dispatch.Workspace); abandoned != nil && failure.Is(abandoned, failure.Concurrency) {
-		snapshot, transitionErr := lifecycle.Apply(lifecycle.Snapshot{State: m.State}, lifecycle.Block)
-		if transitionErr != nil {
-			return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, transitionErr)
-		}
-		m.State, m.BlockedFrom = snapshot.State, snapshot.BlockedFrom
-		if _, updateErr := store.Update(hash, m); updateErr != nil {
-			return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, updateErr)
+		if _, _, err := store.Apply(manifest.ExpectedHash{}, lifecycle.Block, nil); err != nil {
+			return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, err)
 		}
 		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, abandoned)
 	}

@@ -99,17 +99,14 @@ func runReviewRecord(args []string, stdout, stderr interface{ Write([]byte) (int
 		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, err)
 	}
 	sort.Strings(evidenceHashes)
-	m.Review = &manifest.ReviewRecord{Reviewer: *reviewer, Family: *family, SeatID: *seatID, Verdict: verdictValue, Fingerprint: *fingerprintValue, EvidenceHashes: evidenceHashes, At: time.Now().UTC().Format(time.RFC3339)}
+	record := manifest.ReviewRecord{Reviewer: *reviewer, Family: *family, SeatID: *seatID, Verdict: verdictValue, Fingerprint: *fingerprintValue, EvidenceHashes: evidenceHashes, At: time.Now().UTC().Format(time.RFC3339)}
 	if *source != "" {
 		// Source text is deliberately not copied into the authority-bearing model.
 		_ = source
 	}
-	snapshot, err := lifecycle.Apply(lifecycle.Snapshot{State: m.State}, lifecycle.RecordReview)
-	if err != nil {
-		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, err)
-	}
-	m.State = snapshot.State
-	newHash, err := store.Update(hash, m)
+	_, newHash, err := store.Apply(manifest.ExpectedHash{}, lifecycle.RecordReview, func(next *manifest.Manifest) {
+		next.Review = &record
+	})
 	if err != nil {
 		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, err)
 	}
@@ -225,12 +222,7 @@ func runReady(args []string, stdout, stderr interface{ Write([]byte) (int, error
 	if err != nil {
 		return writeResult(stdout, stderr, "ready", *jsonOutput, nil, err)
 	}
-	snapshot, err := lifecycle.Apply(lifecycle.Snapshot{State: m.State}, lifecycle.MarkReady)
-	if err != nil {
-		return writeResult(stdout, stderr, "ready", *jsonOutput, nil, err)
-	}
-	m.State = snapshot.State
-	newHash, err := store.Update(hash, m)
+	_, newHash, err := store.Apply(manifest.ExpectedHash{}, lifecycle.MarkReady, nil)
 	if err != nil {
 		return writeResult(stdout, stderr, "ready", *jsonOutput, nil, err)
 	}
@@ -249,18 +241,10 @@ func runClose(args []string, stdout, stderr interface{ Write([]byte) (int, error
 	if err != nil {
 		return writeResult(stdout, stderr, "close", *jsonOutput, nil, err)
 	}
-	if *expected != "" && *expected != hash {
-		return writeResult(stdout, stderr, "close", *jsonOutput, nil, failure.New(failure.Integrity, "close manifest prior hash mismatch"))
-	}
 	if m.State != lifecycle.Ready {
 		return writeResult(stdout, stderr, "close", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "close lifecycle"))
 	}
-	snapshot, err := lifecycle.Apply(lifecycle.Snapshot{State: m.State}, lifecycle.Close)
-	if err != nil {
-		return writeResult(stdout, stderr, "close", *jsonOutput, nil, err)
-	}
-	m.State = snapshot.State
-	newHash, err := store.Update(hash, m)
+	m, newHash, err := store.Apply(manifest.OptionalHash(*expected, "close"), lifecycle.Close, nil)
 	if err != nil {
 		return writeResult(stdout, stderr, "close", *jsonOutput, nil, err)
 	}

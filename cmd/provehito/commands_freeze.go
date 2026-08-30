@@ -28,20 +28,14 @@ func runFreeze(args []string, stdout, stderr interface{ Write([]byte) (int, erro
 	if m.State != lifecycle.Active {
 		return writeResult(stdout, stderr, "freeze", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "freeze lifecycle"))
 	}
-	if *expected != "" && *expected != hash {
-		return writeResult(stdout, stderr, "freeze", *jsonOutput, nil, failure.New(failure.Integrity, "freeze manifest prior hash mismatch"))
-	}
 	fp, err := fingerprint.NewGitProvider().Freeze(context.Background(), m.Dispatch.Workspace, *base, m.DispatchHash)
 	if err != nil {
 		return writeResult(stdout, stderr, "freeze", *jsonOutput, nil, err)
 	}
-	m.Freeze = &manifest.FreezeRecord{Base: fp.BaseCommit, Head: fp.HeadCommit, Candidate: fp.EquivalentHash, Tree: fp.HeadTree, Diff: fp.DiffHash, At: fp.FrozenAt.UTC().Format("2006-01-02T15:04:05Z")}
-	snapshot, err := lifecycle.Apply(lifecycle.Snapshot{State: m.State}, lifecycle.Freeze)
-	if err != nil {
-		return writeResult(stdout, stderr, "freeze", *jsonOutput, nil, err)
-	}
-	m.State = snapshot.State
-	newHash, err := store.Update(hash, m)
+	record := manifest.FreezeRecord{Base: fp.BaseCommit, Head: fp.HeadCommit, Candidate: fp.EquivalentHash, Tree: fp.HeadTree, Diff: fp.DiffHash, At: fp.FrozenAt.UTC().Format("2006-01-02T15:04:05Z")}
+	m, newHash, err := store.Apply(manifest.OptionalHash(*expected, "freeze"), lifecycle.Freeze, func(next *manifest.Manifest) {
+		next.Freeze = &record
+	})
 	if err != nil {
 		return writeResult(stdout, stderr, "freeze", *jsonOutput, nil, err)
 	}

@@ -27,7 +27,7 @@ func runEvidence(operation string, args []string, stdout, stderr interface{ Writ
 	if *state == "" || *lane == "" || *method == "" {
 		return writeResult(stdout, stderr, "evidence add", *jsonOutput, nil, usageError("evidence method and lane required"))
 	}
-	store, m, hash, err := loadLane(*state, *lane)
+	store, m, _, err := loadLane(*state, *lane)
 	if err != nil {
 		return writeResult(stdout, stderr, "evidence add", *jsonOutput, nil, err)
 	}
@@ -58,8 +58,10 @@ func runEvidence(operation string, args []string, stdout, stderr interface{ Writ
 			return writeResult(stdout, stderr, "evidence add", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "duplicate evidence"))
 		}
 	}
-	m.Evidence = append(m.Evidence, manifestEvidence(*method, receipt.Hash))
-	newHash, err := store.Update(hash, m)
+	reference := manifestEvidence(*method, receipt.Hash)
+	_, newHash, err := store.Mutate(manifest.ExpectedHash{}, func(next *manifest.Manifest) {
+		next.Evidence = append(next.Evidence, reference)
+	})
 	if err != nil {
 		return writeResult(stdout, stderr, "evidence add", *jsonOutput, nil, err)
 	}

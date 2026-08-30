@@ -76,7 +76,7 @@ func Apply(snapshot Snapshot, event Event) (Snapshot, error) {
 	case Blocked:
 		switch event {
 		case Resume:
-			if isResumable(snapshot.BlockedFrom) {
+			if BlockableFrom(snapshot.BlockedFrom) {
 				return Snapshot{State: snapshot.BlockedFrom}, nil
 			}
 		case Abandon:
@@ -92,14 +92,5 @@ func Apply(snapshot Snapshot, event Event) (Snapshot, error) {
 }
 
 func blocked(from State) Snapshot { return Snapshot{State: Blocked, BlockedFrom: from} }
-
-func isResumable(state State) bool {
-	switch state {
-	case Planned, Active, Frozen, Reviewed, Ready:
-		return true
-	default:
-		return false
-	}
-}
 
 var allEvents = []Event{Activate, Freeze, RecordReview, MarkReady, Close, Block, Resume, Abandon, IncidentEvent}

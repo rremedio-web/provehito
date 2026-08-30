@@ -366,25 +366,12 @@ func runLaneTransition(operation string, args []string, stdout, stderr io.Writer
 	if err != nil {
 		return writeResult(stdout, stderr, "lane "+operation, *jsonOutput, nil, err)
 	}
-	store := manifest.NewStore(path, clock.System{})
-	m, hash, err := store.Load()
-	if err != nil {
-		return writeResult(stdout, stderr, "lane "+operation, *jsonOutput, nil, err)
-	}
-	if *expected != hash {
-		return writeResult(stdout, stderr, "lane "+operation, *jsonOutput, nil, failure.New(failure.Integrity, "manifest prior hash mismatch"))
-	}
 	event, _ := lifecycle.ParseEvent(operationEvent(operation))
-	snapshot, err := lifecycle.Apply(lifecycle.Snapshot{State: m.State, BlockedFrom: m.BlockedFrom}, event)
+	m, newHash, err := manifest.NewStore(path, clock.System{}).Apply(manifest.RequiredHash(*expected), event, nil)
 	if err != nil {
 		return writeResult(stdout, stderr, "lane "+operation, *jsonOutput, nil, err)
 	}
-	m.State, m.BlockedFrom = snapshot.State, snapshot.BlockedFrom
-	newHash, err := store.Update(*expected, m)
-	if err != nil {
-		return writeResult(stdout, stderr, "lane "+operation, *jsonOutput, nil, err)
-	}
-	return writeResult(stdout, stderr, "lane "+operation, *jsonOutput, map[string]any{"id": m.LaneID, "state": string(m.State), "previous_hash": hash, "hash": newHash}, nil)
+	return writeResult(stdout, stderr, "lane "+operation, *jsonOutput, map[string]any{"id": m.LaneID, "state": string(m.State), "previous_hash": *expected, "hash": newHash}, nil)
 }
 
 func operationEvent(operation string) string {
