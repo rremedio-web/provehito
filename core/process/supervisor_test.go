@@ -202,6 +202,15 @@ func TestSupervisorCancellationKillsProcess(t *testing.T) {
 	}
 }
 
+func TestSupervisorPreCanceledContextIsCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	result, err := runFakeAgent(t, ctx, adapter.Profile{}, "--sleep-ms", "5000")
+	if err == nil || !result.Canceled {
+		t.Fatalf("pre-canceled context: result=%#v err=%v", result, err)
+	}
+}
+
 func processIsZombie(pid int) bool {
 	return strings.HasPrefix(processState(pid), "Z")
 }
