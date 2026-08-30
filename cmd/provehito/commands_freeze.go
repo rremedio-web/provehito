@@ -52,17 +52,3 @@ func hashList(m manifest.Manifest) []string {
 	}
 	return values
 }
-
-func uniqueHashSet(values []string) bool {
-	seen := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		if !failure.IsHash(value) {
-			return false
-		}
-		if _, exists := seen[value]; exists {
-			return false
-		}
-		seen[value] = struct{}{}
-	}
-	return len(values) > 0
-}

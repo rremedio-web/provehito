@@ -12,7 +12,6 @@ import (
 	"github.com/provehito-project/provehito/core/lifecycle"
 	"github.com/provehito-project/provehito/core/manifest"
 	"github.com/provehito-project/provehito/core/policy"
-	"github.com/provehito-project/provehito/core/review"
 )
 
 func runReview(operation string, args []string, stdout, stderr interface{ Write([]byte) (int, error) }) int {
@@ -41,7 +40,7 @@ func runReviewOpen(args []string, stdout, stderr interface{ Write([]byte) (int, 
 	if err != nil {
 		return writeResult(stdout, stderr, "review open", *jsonOutput, nil, err)
 	}
-	if !sameFrozen(m.Freeze, fp) {
+	if policy.Drifted(m, fp) {
 		return writeResult(stdout, stderr, "review open", *jsonOutput, nil, failure.New(failure.CandidateOrReview, "review open candidate drift"))
 	}
 	return writeResult(stdout, stderr, "review open", *jsonOutput, map[string]any{"lane": m.LaneID, "candidate_hash": m.Freeze.Candidate, "dispatch_hash": m.DispatchHash, "evidence_hashes": hashList(m), "head": fp.HeadCommit, "tree": fp.HeadTree, "diff": fp.DiffHash}, nil)
@@ -71,17 +70,14 @@ func runReviewRecord(args []string, stdout, stderr interface{ Write([]byte) (int
 	if *reviewer == "" || *family == "" || *seatID == "" {
 		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, usageError("reviewer, family, and seat id required"))
 	}
-	if *family == m.Dispatch.Family {
-		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, failure.NewReason(failure.PolicyOrTransition, "review reviewer family", failure.ReasonReviewerFamily))
-	}
-	if *seatID == m.Dispatch.SeatID {
-		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, failure.NewReason(failure.PolicyOrTransition, "review reviewer seat", failure.ReasonReviewerSeat))
+	if reason := policy.IndependenceReason(m.Dispatch.Family, m.Dispatch.SeatID, *family, *seatID); reason != "" {
+		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, policy.IndependenceFailure("review", reason))
 	}
 	fp, err := fingerprint.NewGitProvider().Freeze(context.Background(), m.Dispatch.Workspace, frozenBase(m.Freeze, *base), m.DispatchHash)
 	if err != nil {
 		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, err)
 	}
-	if !sameFrozen(m.Freeze, fp) {
+	if policy.Drifted(m, fp) {
 		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, failure.New(failure.CandidateOrReview, "review candidate drift"))
 	}
 	if *fingerprintValue == "" {
@@ -90,7 +86,7 @@ func runReviewRecord(args []string, stdout, stderr interface{ Write([]byte) (int
 	if *fingerprintValue != m.Freeze.Candidate {
 		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, failure.New(failure.CandidateOrReview, "review fingerprint"))
 	}
-	evidenceHashes, err := verifyLaneEvidence(*state, m)
+	evidenceHashes, err := policy.VerifyEvidence(m, evidence.NewStore(*state))
 	if err != nil {
 		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, err)
 	}
@@ -124,10 +120,6 @@ func parseVerdict(value string) (string, error) {
 	}
 }
 
-func sameFrozen(freeze *manifest.FreezeRecord, fp fingerprint.Fingerprint) bool {
-	return freeze != nil && freeze.Base == fp.BaseCommit && freeze.Head == fp.HeadCommit && freeze.Candidate == fp.EquivalentHash && freeze.Tree == fp.HeadTree && freeze.Diff == fp.DiffHash
-}
-
 func frozenBase(freeze *manifest.FreezeRecord, override string) string {
 	if override != "" {
 		return override
@@ -136,52 +128,6 @@ func frozenBase(freeze *manifest.FreezeRecord, override string) string {
 		return ""
 	}
 	return freeze.Base
-}
-
-func verifyLaneEvidence(state string, m manifest.Manifest) ([]string, error) {
-	if m.Freeze == nil || len(m.Dispatch.RequiredChecks) == 0 {
-		return nil, failure.New(failure.CandidateOrReview, "required evidence")
-	}
-	required := make(map[string]bool, len(m.Dispatch.RequiredChecks))
-	for _, name := range m.Dispatch.RequiredChecks {
-		if name == "" {
-			return nil, failure.New(failure.CandidateOrReview, "required evidence")
-		}
-		if _, exists := required[name]; exists {
-			return nil, failure.New(failure.CandidateOrReview, "duplicate required evidence")
-		}
-		required[name] = false
-	}
-	store := evidence.NewStore(state)
-	hashes := make([]string, 0, len(m.Evidence))
-	seenNames := make(map[string]struct{}, len(m.Evidence))
-	for _, ref := range m.Evidence {
-		if _, exists := seenNames[ref.Name]; exists {
-			return nil, failure.New(failure.CandidateOrReview, "duplicate evidence name")
-		}
-		seenNames[ref.Name] = struct{}{}
-		receipt, err := store.Load(evidence.Reference{Hash: ref.Hash})
-		if err != nil {
-			return nil, err
-		}
-		if receipt.MethodID != ref.Name || receipt.CandidateHash != m.Freeze.Candidate || receipt.ManifestHash != m.DispatchHash ||
-			receipt.ResultClass != evidence.ResultSuccess || receipt.ExitCode != 0 {
-			return nil, failure.New(failure.CandidateOrReview, "evidence binding")
-		}
-		if _, needed := required[ref.Name]; needed {
-			required[ref.Name] = true
-		}
-		hashes = append(hashes, ref.Hash)
-	}
-	if !uniqueHashSet(hashes) {
-		return nil, failure.New(failure.CandidateOrReview, "review evidence")
-	}
-	for _, present := range required {
-		if !present {
-			return nil, failure.New(failure.CandidateOrReview, "required evidence missing")
-		}
-	}
-	return hashes, nil
 }
 
 func runReady(args []string, stdout, stderr interface{ Write([]byte) (int, error) }) int {
@@ -199,26 +145,11 @@ func runReady(args []string, stdout, stderr interface{ Write([]byte) (int, error
 	if m.State != lifecycle.Reviewed || m.Freeze == nil || m.Review == nil {
 		return writeResult(stdout, stderr, "ready", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "ready lifecycle"))
 	}
-	refs := make([]evidence.Reference, 0, len(m.Evidence))
-	for _, ref := range m.Evidence {
-		refs = append(refs, evidence.Reference{Name: ref.Name, Hash: ref.Hash})
-	}
-	verified, err := verifyLaneEvidence(*state, m)
-	if err != nil {
-		return writeResult(stdout, stderr, "ready", *jsonOutput, nil, err)
-	}
-	if !uniqueHashSet(m.Review.EvidenceHashes) {
-		return writeResult(stdout, stderr, "ready", *jsonOutput, nil, failure.New(failure.CandidateOrReview, "ready evidence"))
-	}
 	fp, err := fingerprint.NewGitProvider().Freeze(context.Background(), m.Dispatch.Workspace, frozenBase(m.Freeze, *base), m.DispatchHash)
 	if err != nil {
 		return writeResult(stdout, stderr, "ready", *jsonOutput, nil, err)
 	}
-	if !sameFrozen(m.Freeze, fp) {
-		return writeResult(stdout, stderr, "ready", *jsonOutput, nil, failure.New(failure.CandidateOrReview, "ready candidate drift"))
-	}
-	record := review.Record{ReviewerID: m.Review.Reviewer, ReviewerFamily: m.Review.Family, ReviewerSeatID: m.Review.SeatID, Verdict: review.Verdict(m.Review.Verdict), CandidateEquivalentHash: m.Review.Fingerprint, ManifestHash: m.DispatchHash, EvidenceHashes: append([]string(nil), m.Review.EvidenceHashes...)}
-	ready, err := policy.NewReadiness().Evaluate(policy.Input{State: m.State, Frozen: fp, Current: fp, ManifestHash: m.DispatchHash, RequiredEvidence: refs, VerifiedEvidenceHashes: verified, Review: record, Family: policy.FamilyPolicy{WriterFamily: m.Dispatch.Family, WriterSeatID: m.Dispatch.SeatID, RequireIndependent: true}})
+	ready, err := policy.NewReadiness().Evaluate(policy.Input{Manifest: m, Current: fp, Loader: evidence.NewStore(*state)})
 	if err != nil {
 		return writeResult(stdout, stderr, "ready", *jsonOutput, nil, err)
 	}
