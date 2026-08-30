@@ -95,7 +95,7 @@ func (p *GitProvider) Inspect(ctx context.Context, workspace, base string) (Fing
 // Freeze verifies a clean workspace and binds the identity to a valid
 // manifest hash and injected UTC timestamp.
 func (p *GitProvider) Freeze(ctx context.Context, workspace, base, manifestHash string) (Fingerprint, error) {
-	if !isSHA256(manifestHash) {
+	if !failure.IsHash(manifestHash) {
 		return Fingerprint{}, failure.New(failure.Integrity, "freeze manifest hash")
 	}
 	f, err := p.Inspect(ctx, workspace, base)
@@ -256,14 +256,6 @@ func equivalentHash(f Fingerprint) string {
 	}
 	digest := sha256.Sum256(bytes)
 	return hex.EncodeToString(digest[:])
-}
-
-func isSHA256(value string) bool {
-	if len(value) != sha256.Size*2 {
-		return false
-	}
-	_, err := hex.DecodeString(value)
-	return err == nil && value == strings.ToLower(value)
 }
 
 func isObjectID(value string) bool {

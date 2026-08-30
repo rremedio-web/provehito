@@ -118,7 +118,7 @@ func (s Store) now() time.Time {
 }
 
 func (s Store) pathFor(hash string) (string, error) {
-	if !isHash(hash) {
+	if !failure.IsHash(hash) {
 		return "", failure.New(failure.UsageOrSchema, "evidence hash")
 	}
 	root, err := s.rootPath()
@@ -203,12 +203,12 @@ func ensurePrivateDir(path string) error {
 }
 
 func (s Store) validateReference(ref Reference) (string, error) {
-	if !isHash(ref.Hash) {
+	if !failure.IsHash(ref.Hash) {
 		return "", failure.New(failure.Integrity, "evidence reference hash")
 	}
 	path, err := s.pathFor(ref.Hash)
 	if err != nil {
-		if failure.ExitCodeFor(err) == 10 {
+		if failure.Is(err, failure.UsageOrSchema) {
 			return "", failure.Wrap(failure.Integrity, "evidence reference path", err)
 		}
 		return "", err

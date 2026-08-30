@@ -85,10 +85,8 @@ func evidenceResult(result, class string, code int) (string, int, error) {
 		switch class {
 		case evidence.ResultSuccess:
 			code = 0
-		case evidence.ResultCandidateOrReview:
-			code = 50
-		case evidence.ResultToolingOrAdapter:
-			code = 40
+		case evidence.ResultCandidateOrReview, evidence.ResultToolingOrAdapter:
+			code, _ = failure.CodeFor(failure.Class(class))
 		default:
 			return "", 0, usageError("evidence exit code required")
 		}

@@ -125,7 +125,7 @@ func (r Receipt) validateInput() error {
 		}
 	}
 	if r.SchemaVersion != 1 || r.MethodID == "" || len(r.MethodID) > maxMethodID || hasControl(r.MethodID) ||
-		r.Probe == "" || len(r.Probe) > maxProbeID || hasControl(r.Probe) || !isHash(r.CandidateHash) || !isHash(r.ManifestHash) {
+		r.Probe == "" || len(r.Probe) > maxProbeID || hasControl(r.Probe) || !failure.IsHash(r.CandidateHash) || !failure.IsHash(r.ManifestHash) {
 		return fmt.Errorf("receipt required fields")
 	}
 	if len(r.SeatID) > maxMethodID || hasControl(r.SeatID) {
@@ -136,12 +136,15 @@ func (r Receipt) validateInput() error {
 	}
 	for _, artifact := range r.Artifacts {
 		if artifact.Path != "" || artifact.Name == "" || len(artifact.Name) > maxName ||
-			hasControl(artifact.Name) || !isHash(artifact.Hash) {
+			hasControl(artifact.Name) || !failure.IsHash(artifact.Hash) {
 			return fmt.Errorf("receipt artifact reference")
 		}
 	}
-	expected, ok := resultExitCode(r.ResultClass)
-	if !ok || r.ExitCode != expected {
+	if r.ResultClass == ResultSuccess {
+		if r.ExitCode != 0 {
+			return fmt.Errorf("receipt result class and exit code")
+		}
+	} else if expected, ok := failure.CodeFor(failure.Class(r.ResultClass)); !ok || r.ExitCode != expected {
 		return fmt.Errorf("receipt result class and exit code")
 	}
 	return nil
@@ -164,41 +167,6 @@ func normalizeIdentity(r Receipt) Receipt {
 		r.ManifestHash = r.Candidate.ManifestHash
 	}
 	return r
-}
-
-func resultExitCode(class string) (int, bool) {
-	switch class {
-	case ResultSuccess:
-		return 0, true
-	case ResultUsageOrSchema:
-		return 10, true
-	case ResultPolicyOrTransition:
-		return 20, true
-	case ResultWorkspaceDrift:
-		return 30, true
-	case ResultToolingOrAdapter:
-		return 40, true
-	case ResultCandidateOrReview:
-		return 50, true
-	case ResultIntegrity:
-		return 60, true
-	case ResultConcurrency:
-		return 70, true
-	default:
-		return 0, false
-	}
-}
-
-func isHash(value string) bool {
-	if len(value) != sha256.Size*2 {
-		return false
-	}
-	for _, c := range value {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			return false
-		}
-	}
-	return true
 }
 
 func timestampValid(value string) bool {
@@ -234,7 +202,7 @@ func receiptBytes(r Receipt) ([]byte, error) {
 	if err := r.validateInput(); err != nil {
 		return nil, err
 	}
-	if !timestampValid(r.Timestamp) || !isHash(r.CanonicalHash) {
+	if !timestampValid(r.Timestamp) || !failure.IsHash(r.CanonicalHash) {
 		return nil, fmt.Errorf("receipt identity")
 	}
 	want, err := canonicalHash(r)

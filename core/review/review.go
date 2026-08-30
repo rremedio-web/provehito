@@ -2,7 +2,6 @@
 package review
 
 import (
-	"encoding/hex"
 	"sort"
 
 	"github.com/provehito-project/provehito/core/failure"
@@ -36,8 +35,8 @@ func Validate(frozen fingerprint.Fingerprint, record Record) error {
 		(record.Verdict != Pass && record.Verdict != Fail) ||
 		record.CandidateEquivalentHash == "" || frozen.EquivalentHash == "" ||
 		record.ManifestHash == "" || frozen.ManifestHash == "" ||
-		!isHash(record.CandidateEquivalentHash) || !isHash(frozen.EquivalentHash) ||
-		!isHash(record.ManifestHash) || !isHash(frozen.ManifestHash) ||
+		!failure.IsHash(record.CandidateEquivalentHash) || !failure.IsHash(frozen.EquivalentHash) ||
+		!failure.IsHash(record.ManifestHash) || !failure.IsHash(frozen.ManifestHash) ||
 		record.CandidateEquivalentHash != frozen.EquivalentHash ||
 		record.ManifestHash != frozen.ManifestHash {
 		return failure.New(failure.CandidateOrReview, "review binding")
@@ -55,19 +54,11 @@ func validSet(values []string) bool {
 	copyValues := append([]string(nil), values...)
 	sort.Strings(copyValues)
 	for i, value := range copyValues {
-		if !isHash(value) || i > 0 && copyValues[i-1] == value {
+		if !failure.IsHash(value) || i > 0 && copyValues[i-1] == value {
 			return false
 		}
 	}
 	return true
-}
-
-func isHash(value string) bool {
-	if len(value) != 64 {
-		return false
-	}
-	decoded, err := hex.DecodeString(value)
-	return err == nil && hex.EncodeToString(decoded) == value
 }
 
 // EvidenceEqual reports equality of two content-address sets.

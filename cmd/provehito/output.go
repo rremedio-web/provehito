@@ -40,12 +40,12 @@ func writeResult(stdout, stderr io.Writer, command string, jsonOutput bool, data
 	if message == "" {
 		message = "command failed"
 	}
-	r := result{OK: false, Command: command, Class: string(class), Message: message, Correction: correctionFor(class, operation), Data: data}
+	r := result{OK: false, Command: command, Class: string(class), Message: message, Correction: correctionFor(err, class), Data: data}
 	if jsonOutput {
 		_ = json.NewEncoder(stdout).Encode(r)
 	} else {
 		fmt.Fprintf(stdout, "RESULT: ERROR %s [%s]\n", command, class)
-		fmt.Fprintf(stdout, "Correction: %s\n", correctionFor(class, operation))
+		fmt.Fprintf(stdout, "Correction: %s\n", correctionFor(err, class))
 	}
 	_ = stderr
 	return failure.ExitCodeFor(err)
@@ -59,13 +59,15 @@ func errorDetails(err error) (failure.Class, string) {
 	return failure.UsageOrSchema, "invalid command input"
 }
 
-func correctionFor(class failure.Class, operation string) string {
-	switch operation {
-	case "review reviewer family", "readiness reviewer family":
+// correctionFor keys the remedy on the failure's typed reason, so a renamed
+// operation string can no longer silently degrade the correction.
+func correctionFor(err error, class failure.Class) string {
+	switch failure.ReasonFor(err) {
+	case failure.ReasonReviewerFamily:
 		return "set --family on review record to a value different from the dispatch family used by the writer"
-	case "review reviewer seat", "readiness reviewer seat":
+	case failure.ReasonReviewerSeat:
 		return "set --seat-id on review record to a seat different from the writer seat"
-	case "agent writer seat":
+	case failure.ReasonWriterSeat:
 		return "set --seat-id or PROVEHITO_SEAT_ID to the writer seat declared by lane open"
 	}
 	switch class {

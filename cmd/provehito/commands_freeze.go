@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"strings"
 
 	"github.com/provehito-project/provehito/core/failure"
 	"github.com/provehito-project/provehito/core/fingerprint"
@@ -63,7 +62,7 @@ func hashList(m manifest.Manifest) []string {
 func uniqueHashSet(values []string) bool {
 	seen := make(map[string]struct{}, len(values))
 	for _, value := range values {
-		if len(value) != 64 || strings.Trim(value, "0123456789abcdef") != "" {
+		if !failure.IsHash(value) {
 			return false
 		}
 		if _, exists := seen[value]; exists {

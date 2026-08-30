@@ -285,7 +285,7 @@ func validate(m Manifest) error {
 		return failure.New(failure.UsageOrSchema, "manifest review required")
 	}
 	for _, evidence := range m.Evidence {
-		if evidence.Name == "" || !isLowerHexHash(evidence.Hash) {
+		if evidence.Name == "" || !failure.IsHash(evidence.Hash) {
 			return failure.New(failure.UsageOrSchema, "manifest evidence reference")
 		}
 	}
@@ -401,25 +401,13 @@ func isBlockedFromState(state lifecycle.State) bool {
 	}
 }
 
-func isLowerHexHash(value string) bool {
-	if len(value) != 64 {
-		return false
-	}
-	for _, character := range value {
-		if !(character >= '0' && character <= '9') && !(character >= 'a' && character <= 'f') {
-			return false
-		}
-	}
-	return true
-}
-
 func validHashSet(values []string) bool {
 	if len(values) == 0 {
 		return false
 	}
 	seen := make(map[string]struct{}, len(values))
 	for _, value := range values {
-		if !isLowerHexHash(value) {
+		if !failure.IsHash(value) {
 			return false
 		}
 		if _, ok := seen[value]; ok {

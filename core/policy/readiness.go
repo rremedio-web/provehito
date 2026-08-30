@@ -52,10 +52,10 @@ func (r *Readiness) Evaluate(input Input) (ReadyRecord, error) {
 	}
 	writerFamily, independent := input.Family.WriterFamily, input.Family.RequireIndependent
 	if independent && (writerFamily == "" || input.Review.ReviewerFamily == "" || writerFamily == input.Review.ReviewerFamily) {
-		return ReadyRecord{}, failure.New(failure.PolicyOrTransition, "readiness reviewer family")
+		return ReadyRecord{}, failure.NewReason(failure.PolicyOrTransition, "readiness reviewer family", failure.ReasonReviewerFamily)
 	}
 	if independent && (input.Family.WriterSeatID == "" || input.Review.ReviewerSeatID == "" || input.Family.WriterSeatID == input.Review.ReviewerSeatID) {
-		return ReadyRecord{}, failure.New(failure.PolicyOrTransition, "readiness reviewer seat")
+		return ReadyRecord{}, failure.NewReason(failure.PolicyOrTransition, "readiness reviewer seat", failure.ReasonReviewerSeat)
 	}
 	if input.Review.Verdict == "" {
 		return ReadyRecord{}, failure.New(failure.PolicyOrTransition, "readiness explicit verdict")

@@ -72,10 +72,10 @@ func runReviewRecord(args []string, stdout, stderr interface{ Write([]byte) (int
 		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, usageError("reviewer, family, and seat id required"))
 	}
 	if *family == m.Dispatch.Family {
-		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "review reviewer family"))
+		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, failure.NewReason(failure.PolicyOrTransition, "review reviewer family", failure.ReasonReviewerFamily))
 	}
 	if *seatID == m.Dispatch.SeatID {
-		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "review reviewer seat"))
+		return writeResult(stdout, stderr, "review record", *jsonOutput, nil, failure.NewReason(failure.PolicyOrTransition, "review reviewer seat", failure.ReasonReviewerSeat))
 	}
 	fp, err := fingerprint.NewGitProvider().Freeze(context.Background(), m.Dispatch.Workspace, frozenBase(m.Freeze, *base), m.DispatchHash)
 	if err != nil {

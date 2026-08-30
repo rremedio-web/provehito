@@ -104,7 +104,7 @@ func runAgent(args []string, stdout, stderr interface{ Write([]byte) (int, error
 		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "agent profile dispatch mismatch"))
 	}
 	if *seatID != m.Dispatch.SeatID {
-		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "agent writer seat"))
+		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, failure.NewReason(failure.PolicyOrTransition, "agent writer seat", failure.ReasonWriterSeat))
 	}
 	duration, err := parseDuration(*timeout)
 	if err != nil {
@@ -127,7 +127,7 @@ func runAgent(args []string, stdout, stderr interface{ Write([]byte) (int, error
 		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "agent cost class mismatch"))
 	}
 	manager := workspace.NewLeaseManager(*state)
-	if abandoned := manager.DetectAbandoned(m.Dispatch.Workspace); abandoned != nil && failure.ExitCodeFor(abandoned) == 70 {
+	if abandoned := manager.DetectAbandoned(m.Dispatch.Workspace); abandoned != nil && failure.Is(abandoned, failure.Concurrency) {
 		snapshot, transitionErr := lifecycle.Apply(lifecycle.Snapshot{State: m.State}, lifecycle.Block)
 		if transitionErr != nil {
 			return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, transitionErr)
@@ -158,7 +158,7 @@ func runAgent(args []string, stdout, stderr interface{ Write([]byte) (int, error
 		exitCode = failure.ExitCodeFor(runErr)
 	} else if result.ExitCode != 0 {
 		resultClass = evidence.ResultCandidateOrReview
-		exitCode = failure.ExitCodeFor(failure.New(failure.CandidateOrReview, "agent process exit"))
+		exitCode, _ = failure.CodeFor(failure.CandidateOrReview)
 	}
 	stdoutHash := result.StdoutHash
 	stderrHash := result.StderrHash
