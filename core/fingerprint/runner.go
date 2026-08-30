@@ -3,6 +3,7 @@ package fingerprint
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 )
@@ -75,7 +76,8 @@ func hardenedGitArgs(args []string) []string {
 }
 
 func explicitEnvironment(executable string) []string {
-	pathValue := filepath.Dir(executable)
+	separator := string(os.PathListSeparator)
+	pathValue := filepath.Dir(executable) + separator + "/usr/bin" + separator + "/bin"
 	return []string{
 		"PATH=" + pathValue,
 		"LC_ALL=C",
