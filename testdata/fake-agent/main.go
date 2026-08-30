@@ -49,20 +49,20 @@ func main() {
 	printSecrets := flag.Bool("print-secrets", false, "print synthetic secret-shaped output")
 	flag.Parse()
 	if *child {
-		if *marker != "" {
-			if err := os.WriteFile(*marker, []byte(strconv.Itoa(os.Getpid())), 0o600); err != nil {
-				panic(err)
-			}
-		}
 		time.Sleep(time.Duration(*sleepMS) * time.Millisecond)
 		return
 	}
 	if *spawn {
-		command := exec.Command(os.Args[0], "--child", "--marker", *marker, "--sleep-ms", strconv.Itoa(*sleepMS))
+		command := exec.Command(os.Args[0], "--child", "--sleep-ms", strconv.Itoa(*sleepMS))
 		command.Stdout = os.Stdout
 		command.Stderr = os.Stderr
 		if err := command.Start(); err != nil {
 			panic(err)
+		}
+		if *marker != "" {
+			if err := os.WriteFile(*marker, []byte(strconv.Itoa(command.Process.Pid)), 0o600); err != nil {
+				panic(err)
+			}
 		}
 	}
 	if *printEnv {

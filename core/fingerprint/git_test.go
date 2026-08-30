@@ -265,7 +265,8 @@ func TestExecRunnerAppliesGitHardeningFlagsAndEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSuffix(string(env), "\n"), "\n")
-	if len(lines) != 8 || lines[0] != "C" || lines[1] != "C" || lines[2] != "UTC" || lines[3] != root ||
+	wantPath := strings.Join([]string{root, "/usr/bin", "/bin"}, string(os.PathListSeparator))
+	if len(lines) != 8 || lines[0] != "C" || lines[1] != "C" || lines[2] != "UTC" || lines[3] != wantPath ||
 		lines[4] != "1" || lines[5] != "/dev/null" || lines[6] != "1" || lines[7] != "0" {
 		t.Fatalf("runner hardened environment: %q", string(env))
 	}
@@ -473,7 +474,7 @@ func TestExecRunnerUsesFixedMinimalEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	script := filepath.Join(root, "git-probe")
-	contents := "#!/bin/sh\nprintf '%s\\n' \"$LC_ALL\" \"$LANG\" \"$TZ\" \"$PATH\" \"$GIT_CONFIG_NOSYSTEM\" \"$GIT_CONFIG_GLOBAL\" \"$GIT_ATTR_NOSYSTEM\" \"$GIT_OPTIONAL_LOCKS\" > " + capture + "\nexec " + gitPath + " \"$@\"\n"
+	contents := "#!/bin/sh\nset -e\nprintf x | sed 's/x/x/' >/dev/null\nprintf '%s\\n' \"$LC_ALL\" \"$LANG\" \"$TZ\" \"$PATH\" \"$GIT_CONFIG_NOSYSTEM\" \"$GIT_CONFIG_GLOBAL\" \"$GIT_ATTR_NOSYSTEM\" \"$GIT_OPTIONAL_LOCKS\" > " + capture + "\nexec " + gitPath + " \"$@\"\n"
 	if err := os.WriteFile(script, []byte(contents), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -486,7 +487,8 @@ func TestExecRunnerUsesFixedMinimalEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSuffix(string(env), "\n"), "\n")
-	if len(lines) != 8 || lines[0] != "C" || lines[1] != "C" || lines[2] != "UTC" || lines[3] != root ||
+	wantPath := strings.Join([]string{root, "/usr/bin", "/bin"}, string(os.PathListSeparator))
+	if len(lines) != 8 || lines[0] != "C" || lines[1] != "C" || lines[2] != "UTC" || lines[3] != wantPath ||
 		lines[4] != "1" || lines[5] != "/dev/null" || lines[6] != "1" || lines[7] != "0" {
 		t.Fatalf("runner environment: %q", string(env))
 	}

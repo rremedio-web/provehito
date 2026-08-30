@@ -19,11 +19,29 @@ const (
 	Concurrency        Class = "CONCURRENCY"
 )
 
+// Reason is a typed, rename-safe cause a presenter may dispatch on. Unlike
+// Op, which is free-text diagnostics, a Reason is a declared constant, so a
+// correction keyed on it fails to compile rather than silently degrading.
+type Reason string
+
+const (
+	// ReasonReviewerFamily marks a review rejected because the reviewer
+	// family is not independent of the writer family.
+	ReasonReviewerFamily Reason = "reviewer_family"
+	// ReasonReviewerSeat marks a review rejected because the reviewer seat
+	// is not independent of the writer seat.
+	ReasonReviewerSeat Reason = "reviewer_seat"
+	// ReasonWriterSeat marks an agent run rejected because the caller seat
+	// is not the writer seat declared by the dispatch.
+	ReasonWriterSeat Reason = "writer_seat"
+)
+
 // Error is a classified failure with the operation that produced it.
 type Error struct {
-	Class Class
-	Op    string
-	Err   error
+	Class  Class
+	Op     string
+	Reason Reason
+	Err    error
 }
 
 // Error implements error.
@@ -55,6 +73,59 @@ func Wrap(class Class, op string, err error) *Error {
 	return &Error{Class: class, Op: op, Err: err}
 }
 
+// NewReason creates a classified failure carrying a typed reason a presenter
+// may dispatch on.
+func NewReason(class Class, op string, reason Reason) *Error {
+	return &Error{Class: class, Op: op, Reason: reason}
+}
+
+// ReasonFor returns the typed reason of a classified failure. It returns the
+// empty reason for unclassified failures and classified failures without one.
+func ReasonFor(err error) Reason {
+	var classified *Error
+	if !errors.As(err, &classified) {
+		return ""
+	}
+	if classified == nil {
+		return ""
+	}
+	return classified.Reason
+}
+
+// Is reports whether err is a classified failure of the given class. It
+// inspects wrapped causes and returns false for unclassified errors.
+func Is(err error, class Class) bool {
+	var classified *Error
+	if !errors.As(err, &classified) {
+		return false
+	}
+	return classified != nil && classified.Class == class
+}
+
+// CodeFor maps a failure class to its stable exit code. This is the only
+// class-to-exit-code table in the codebase; the second return reports whether
+// the class is known.
+func CodeFor(class Class) (int, bool) {
+	switch class {
+	case UsageOrSchema:
+		return 10, true
+	case PolicyOrTransition:
+		return 20, true
+	case WorkspaceDrift:
+		return 30, true
+	case ToolingOrAdapter:
+		return 40, true
+	case CandidateOrReview:
+		return 50, true
+	case Integrity:
+		return 60, true
+	case Concurrency:
+		return 70, true
+	default:
+		return 0, false
+	}
+}
+
 // ExitCodeFor maps a classified failure to its process exit code.
 func ExitCodeFor(err error) int {
 	if err == nil {
@@ -66,22 +137,23 @@ func ExitCodeFor(err error) int {
 		return 1
 	}
 
-	switch classified.Class {
-	case UsageOrSchema:
-		return 10
-	case PolicyOrTransition:
-		return 20
-	case WorkspaceDrift:
-		return 30
-	case ToolingOrAdapter:
-		return 40
-	case CandidateOrReview:
-		return 50
-	case Integrity:
-		return 60
-	case Concurrency:
-		return 70
-	default:
+	code, ok := CodeFor(classified.Class)
+	if !ok {
 		return 1
 	}
+	return code
+}
+
+// IsHash reports whether value is a 64-character lowercase hexadecimal
+// SHA-256 content hash. It is the one hash-shape predicate in the codebase.
+func IsHash(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, c := range value {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return false
+		}
+	}
+	return true
 }

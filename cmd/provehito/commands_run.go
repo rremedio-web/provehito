@@ -2,14 +2,11 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -47,18 +44,9 @@ func parseDuration(value string) (time.Duration, error) {
 	return duration, nil
 }
 
-func profileRank(cost string) (int, bool) {
-	switch strings.ToLower(cost) {
-	case "economy", "cheap", "low":
-		return 0, true
-	case "standard", "medium":
-		return 1, true
-	case "premium", "high":
-		return 2, true
-	default:
-		return 0, false
-	}
-}
+// agentRunner is the process seam. The os/exec Supervisor is the production
+// adapter; tests substitute an in-memory runner.
+var agentRunner process.Runner = &process.Supervisor{}
 
 func runAgent(args []string, stdout, stderr interface{ Write([]byte) (int, error) }) int {
 	fs := commandFlags("agent run")
@@ -104,18 +92,13 @@ func runAgent(args []string, stdout, stderr interface{ Write([]byte) (int, error
 		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "agent profile dispatch mismatch"))
 	}
 	if *seatID != m.Dispatch.SeatID {
-		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "agent writer seat"))
+		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, failure.NewReason(failure.PolicyOrTransition, "agent writer seat", failure.ReasonWriterSeat))
 	}
 	duration, err := parseDuration(*timeout)
 	if err != nil {
 		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, err)
 	}
-	wholeSeconds, fractional := duration/time.Second, duration%time.Second
-	if m.Dispatch.MaxSeconds <= 0 || int64(wholeSeconds) > m.Dispatch.MaxSeconds || int64(wholeSeconds) == m.Dispatch.MaxSeconds && fractional > 0 ||
-		m.Dispatch.MaxOutputBytes <= 0 || *outputLimit > m.Dispatch.MaxOutputBytes {
-		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "agent profile exceeds dispatch limits"))
-	}
-	costRank, knownCost := profileRank(*cost)
+	costRank, knownCost := adapter.CostRankFor(*cost)
 	if !knownCost {
 		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, usageError("agent cost class"))
 	}
@@ -123,18 +106,19 @@ func runAgent(args []string, stdout, stderr interface{ Write([]byte) (int, error
 	if !capabilities.set || len(capabilities.values) == 0 {
 		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, usageError("agent capability required"))
 	}
-	if *cost != m.Dispatch.CostClass {
-		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "agent cost class mismatch"))
+	if err := adapter.ValidateDispatch(profile, *cost, adapter.DispatchEnvelope{
+		Adapter:        m.Dispatch.Adapter,
+		Family:         m.Dispatch.Family,
+		MaxSeconds:     m.Dispatch.MaxSeconds,
+		MaxOutputBytes: m.Dispatch.MaxOutputBytes,
+		CostClass:      m.Dispatch.CostClass,
+	}); err != nil {
+		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, err)
 	}
 	manager := workspace.NewLeaseManager(*state)
-	if abandoned := manager.DetectAbandoned(m.Dispatch.Workspace); abandoned != nil && failure.ExitCodeFor(abandoned) == 70 {
-		snapshot, transitionErr := lifecycle.Apply(lifecycle.Snapshot{State: m.State}, lifecycle.Block)
-		if transitionErr != nil {
-			return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, transitionErr)
-		}
-		m.State, m.BlockedFrom = snapshot.State, snapshot.BlockedFrom
-		if _, updateErr := store.Update(hash, m); updateErr != nil {
-			return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, updateErr)
+	if abandoned := manager.DetectAbandoned(m.Dispatch.Workspace); abandoned != nil && failure.Is(abandoned, failure.Concurrency) {
+		if _, _, err := store.Apply(manifest.ExpectedHash{}, lifecycle.Block, nil); err != nil {
+			return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, err)
 		}
 		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, abandoned)
 	}
@@ -149,7 +133,7 @@ func runAgent(args []string, stdout, stderr interface{ Write([]byte) (int, error
 	if err != nil {
 		return writeResult(stdout, stderr, "agent run", *jsonOutput, nil, err)
 	}
-	result, runErr := (&process.Supervisor{}).Run(ctx, process.Request{Workspace: m.Dispatch.Workspace, Lease: lease, Profile: profile})
+	result, runErr := agentRunner.Run(ctx, process.Request{Workspace: m.Dispatch.Workspace, Lease: lease, Profile: profile})
 	resultClass := evidence.ResultSuccess
 	exitCode := 0
 	if runErr != nil {
@@ -158,15 +142,15 @@ func runAgent(args []string, stdout, stderr interface{ Write([]byte) (int, error
 		exitCode = failure.ExitCodeFor(runErr)
 	} else if result.ExitCode != 0 {
 		resultClass = evidence.ResultCandidateOrReview
-		exitCode = failure.ExitCodeFor(failure.New(failure.CandidateOrReview, "agent process exit"))
+		exitCode, _ = failure.CodeFor(failure.CandidateOrReview)
 	}
 	stdoutHash := result.StdoutHash
 	stderrHash := result.StderrHash
 	if stdoutHash == "" {
-		stdoutHash = emptyStreamHash()
+		stdoutHash = process.EmptyStreamHash()
 	}
 	if stderrHash == "" {
-		stderrHash = emptyStreamHash()
+		stderrHash = process.EmptyStreamHash()
 	}
 	probe := fmt.Sprintf(
 		"exit=%d duration_ms=%d stdout_truncated=%t stderr_truncated=%t stdout_hash=%s stderr_hash=%s",
@@ -215,8 +199,4 @@ func runAgent(args []string, stdout, stderr interface{ Write([]byte) (int, error
 		return writeResult(stdout, stderr, "agent run", *jsonOutput, data, failure.New(failure.CandidateOrReview, "agent process exit"))
 	}
 	return writeResult(stdout, stderr, "agent run", *jsonOutput, data, nil)
-}
-
-func emptyStreamHash() string {
-	return hex.EncodeToString(sha256.New().Sum(nil))
 }

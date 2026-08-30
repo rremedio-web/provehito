@@ -44,6 +44,12 @@ type Result struct {
 	Signaled        bool
 }
 
+// Runner runs one supervised foreground process. Supervisor is the
+// production os/exec adapter; tests supply an in-memory runner.
+type Runner interface {
+	Run(context.Context, Request) (Result, error)
+}
+
 // Supervisor is a stateless foreground process supervisor.
 type Supervisor struct{}
 
@@ -58,9 +64,7 @@ func (s *Supervisor) Run(ctx context.Context, request Request) (Result, error) {
 	args := make([]string, 0, len(request.Profile.Args)+len(request.Args))
 	args = append(args, request.Profile.Args...)
 	args = append(args, request.Args...)
-	runContext, cancel := context.WithCancel(ctx)
-	defer cancel()
-	command := exec.CommandContext(runContext, request.Profile.Executable, args...)
+	command := exec.Command(request.Profile.Executable, args...)
 	command.Dir = request.Workspace
 	command.Env = allowlistedEnvironment(request.Profile.EnvAllowlist)
 	configureProcessGroup(command)
@@ -71,8 +75,20 @@ func (s *Supervisor) Run(ctx context.Context, request Request) (Result, error) {
 	command.Stdout = stdout
 	command.Stderr = stderr
 	started := time.Now()
+	select {
+	case <-ctx.Done():
+		empty := EmptyStreamHash()
+		return Result{
+			ExitCode:   -1,
+			Duration:   time.Since(started),
+			StdoutHash: empty,
+			StderrHash: empty,
+			Canceled:   true,
+		}, failure.Wrap(failure.ToolingOrAdapter, "agent process canceled", ctx.Err())
+	default:
+	}
 	if err := command.Start(); err != nil {
-		empty := emptyStreamHash()
+		empty := EmptyStreamHash()
 		return Result{
 			ExitCode:   -1,
 			Duration:   time.Since(started),
@@ -94,12 +110,10 @@ func (s *Supervisor) Run(ctx context.Context, request Request) (Result, error) {
 	case <-timer.C:
 		timedOut = true
 		terminationErr = terminateProcessGroup(command.Process.Pid)
-		cancel()
 		waitErr = <-wait
 	case <-ctx.Done():
 		canceled = true
 		terminationErr = terminateProcessGroup(command.Process.Pid)
-		cancel()
 		waitErr = <-wait
 	}
 
@@ -264,6 +278,8 @@ func (w *boundedWriter) Hash() string {
 
 func (w *boundedWriter) Truncated() bool { return w.truncated }
 
-func emptyStreamHash() string {
+// EmptyStreamHash is the content hash of the empty stream. It is the one
+// definition; callers use it for missing stream evidence.
+func EmptyStreamHash() string {
 	return hex.EncodeToString(sha256.New().Sum(nil))
 }

@@ -27,7 +27,7 @@ func runEvidence(operation string, args []string, stdout, stderr interface{ Writ
 	if *state == "" || *lane == "" || *method == "" {
 		return writeResult(stdout, stderr, "evidence add", *jsonOutput, nil, usageError("evidence method and lane required"))
 	}
-	store, m, hash, err := loadLane(*state, *lane)
+	store, m, _, err := loadLane(*state, *lane)
 	if err != nil {
 		return writeResult(stdout, stderr, "evidence add", *jsonOutput, nil, err)
 	}
@@ -58,8 +58,8 @@ func runEvidence(operation string, args []string, stdout, stderr interface{ Writ
 			return writeResult(stdout, stderr, "evidence add", *jsonOutput, nil, failure.New(failure.PolicyOrTransition, "duplicate evidence"))
 		}
 	}
-	m.Evidence = append(m.Evidence, manifestEvidence(*method, receipt.Hash))
-	newHash, err := store.Update(hash, m)
+	reference := manifestEvidence(*method, receipt.Hash)
+	_, newHash, err := store.AddEvidence(reference)
 	if err != nil {
 		return writeResult(stdout, stderr, "evidence add", *jsonOutput, nil, err)
 	}
@@ -85,10 +85,8 @@ func evidenceResult(result, class string, code int) (string, int, error) {
 		switch class {
 		case evidence.ResultSuccess:
 			code = 0
-		case evidence.ResultCandidateOrReview:
-			code = 50
-		case evidence.ResultToolingOrAdapter:
-			code = 40
+		case evidence.ResultCandidateOrReview, evidence.ResultToolingOrAdapter:
+			code, _ = failure.CodeFor(failure.Class(class))
 		default:
 			return "", 0, usageError("evidence exit code required")
 		}

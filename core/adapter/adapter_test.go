@@ -1,62 +1,81 @@
 package adapter_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/provehito-project/provehito/core/adapter"
+	"github.com/provehito-project/provehito/core/failure"
 )
 
-func TestSelectCheapestEligible(t *testing.T) {
-	profiles := []adapter.Profile{
-		validProfile("premium", 30),
-		validProfile("economy", 10),
+func TestCostRankForMapsTheDeclaredVocabulary(t *testing.T) {
+	cases := map[string]struct {
+		rank int
+		ok   bool
+	}{
+		"economy": {0, true}, "cheap": {0, true}, "low": {0, true},
+		"standard": {1, true}, "medium": {1, true}, "ECONOMY": {0, true},
+		"premium": {2, true}, "high": {2, true},
+		"": {0, false}, "unknown": {0, false},
 	}
-	got, err := adapter.SelectCheapest(profiles, adapter.Requirement{Capability: "writer"})
-	if err != nil || got.ID != "economy" {
-		t.Fatalf("got %#v err %v", got, err)
-	}
-}
-
-func TestSelectCheapestUsesStableIDTieBreak(t *testing.T) {
-	profiles := []adapter.Profile{validProfile("zeta", 10), validProfile("alpha", 10)}
-	got, err := adapter.SelectCheapest(profiles, adapter.Requirement{Capability: "writer"})
-	if err != nil || got.ID != "alpha" {
-		t.Fatalf("got %#v err %v", got, err)
-	}
-}
-
-func TestSelectCheapestRejectsCapabilityAndFamilyMismatch(t *testing.T) {
-	profiles := []adapter.Profile{validProfile("writer", 1)}
-	profiles[0].Family = "same"
-	if _, err := adapter.SelectCheapest(profiles, adapter.Requirement{Capability: "reviewer"}); err == nil {
-		t.Fatal("missing capability was accepted")
-	}
-	if _, err := adapter.SelectCheapest(profiles, adapter.Requirement{Capability: "writer", ExcludedFamily: "same"}); err == nil {
-		t.Fatal("excluded family was accepted")
+	for class, want := range cases {
+		rank, ok := adapter.CostRankFor(class)
+		if rank != want.rank || ok != want.ok {
+			t.Errorf("class %q: got (%d, %t)", class, rank, ok)
+		}
 	}
 }
 
-func validProfile(id string, cost int) adapter.Profile {
+func envelope() adapter.DispatchEnvelope {
+	return adapter.DispatchEnvelope{
+		Adapter: "local", Family: "family-a",
+		MaxSeconds: 5, MaxOutputBytes: 4096, CostClass: "economy",
+	}
+}
+
+func dispatchProfile() adapter.Profile {
 	return adapter.Profile{
-		ID: id, Executable: "/bin/true", Family: "local", CostRank: cost,
-		Capabilities: []string{"writer"}, Timeout: time.Second, OutputLimit: 128,
+		ID: "local", Executable: "/bin/true", Family: "family-a",
+		Capabilities: []string{"writer"}, Timeout: 5 * time.Second, OutputLimit: 4096,
 	}
 }
 
-func TestSelectCheapestRejectsInvalidLaunchProfile(t *testing.T) {
-	cases := map[string]func(*adapter.Profile){
-		"relative executable": func(profile *adapter.Profile) { profile.Executable = "true" },
-		"bad environment":     func(profile *adapter.Profile) { profile.EnvAllowlist = []string{"BAD=NAME"} },
-		"zero timeout":        func(profile *adapter.Profile) { profile.Timeout = 0 },
+func TestValidateDispatchAcceptsFittingProfile(t *testing.T) {
+	if err := adapter.ValidateDispatch(dispatchProfile(), "economy", envelope()); err != nil {
+		t.Fatal(err)
 	}
-	for name, mutate := range cases {
-		t.Run(name, func(t *testing.T) {
-			invalid := validProfile("invalid", 1)
-			mutate(&invalid)
-			valid := validProfile("valid", 2)
-			if _, err := adapter.SelectCheapest([]adapter.Profile{invalid, valid}, adapter.Requirement{Capability: "writer"}); err == nil {
-				t.Fatal("invalid launch profile was accepted")
+}
+
+func TestValidateDispatchRejects(t *testing.T) {
+	cases := []struct {
+		name   string
+		mutate func(*adapter.Profile, *string, *adapter.DispatchEnvelope)
+		code   int
+		op     string
+	}{
+		{"adapter identity mismatch", func(p *adapter.Profile, c *string, e *adapter.DispatchEnvelope) { p.ID = "other" }, 20, "agent profile dispatch mismatch"},
+		{"family identity mismatch", func(p *adapter.Profile, c *string, e *adapter.DispatchEnvelope) { p.Family = "family-b" }, 20, "agent profile dispatch mismatch"},
+		{"seconds over limit", func(p *adapter.Profile, c *string, e *adapter.DispatchEnvelope) { p.Timeout = 6 * time.Second }, 20, "agent profile exceeds dispatch limits"},
+		{"sub-second over limit", func(p *adapter.Profile, c *string, e *adapter.DispatchEnvelope) {
+			p.Timeout = 5*time.Second + time.Millisecond
+		}, 20, "agent profile exceeds dispatch limits"},
+		{"dispatch seconds unset", func(p *adapter.Profile, c *string, e *adapter.DispatchEnvelope) { e.MaxSeconds = 0 }, 20, "agent profile exceeds dispatch limits"},
+		{"dispatch output unset", func(p *adapter.Profile, c *string, e *adapter.DispatchEnvelope) { e.MaxOutputBytes = 0 }, 20, "agent profile exceeds dispatch limits"},
+		{"output over limit", func(p *adapter.Profile, c *string, e *adapter.DispatchEnvelope) { p.OutputLimit = 4097 }, 20, "agent profile exceeds dispatch limits"},
+		{"cost class mismatch", func(p *adapter.Profile, c *string, e *adapter.DispatchEnvelope) { *c = "premium" }, 20, "agent cost class mismatch"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			profile, class, env := dispatchProfile(), "economy", envelope()
+			tc.mutate(&profile, &class, &env)
+			err := adapter.ValidateDispatch(profile, class, env)
+			if failure.ExitCodeFor(err) != tc.code {
+				t.Fatalf("got %v", err)
+			}
+			var classified *failure.Error
+			if !errors.As(err, &classified) || classified.Op != tc.op {
+				t.Fatalf("op: got %v", err)
 			}
 		})
 	}

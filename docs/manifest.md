@@ -22,9 +22,22 @@ YAML and unknown JSON fields are not authoritative in Phase 1.
 | `freeze` | Base/head/tree/diff candidate fingerprints and timestamp. |
 | `review` | Reviewer, family, seat ID, verdict, fingerprint, evidence hashes, timestamp. |
 | `evidence` | Named references to immutable receipt hashes. |
-| `failures` | Typed failure records, when recorded by a caller. |
+| `failures` | Deprecated: validated and normalized but has no writer or reader. Kept in schema v1; removal is a schema-version decision. |
 | `created_at`, `updated_at` | UTC RFC3339 timestamps to the second. |
-| `external_actions_human_only` | Must be `true`. |
+| `external_actions_human_only` | Deprecated: constant `true` with no reader. Kept in schema v1; removal is a schema-version decision. |
+
+Deprecated fields stay in the published schema and in validation. Removing
+them is a schema-version decision reserved for the owner; Phase 1 code does
+not write them.
+
+## Operations
+
+Mutations do not hand-edit fields: the store exposes one operations seam —
+`Apply` for lifecycle events with optional field changes, `Mutate` for
+event-less field changes — plus the named operations `RecordFreeze`,
+`RecordReview`, and `AddEvidence` built on it. The seam owns the
+compare-and-swap policy, the complete lifecycle snapshot (including
+`blocked_from`), and update timestamps.
 
 ## Dispatch
 

@@ -2,12 +2,19 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"testing"
+	"time"
 
+	"github.com/provehito-project/provehito/core/failure"
+	"github.com/provehito-project/provehito/core/process"
 	"github.com/provehito-project/provehito/core/workspace"
 )
 
@@ -111,8 +118,9 @@ func TestVerticalSliceFailureClasses(t *testing.T) {
 	})
 	t.Run("timeout", func(t *testing.T) {
 		_, state, _ := setupLane(t)
-		profile := fakeProfile(t)
-		assertCLIClass(t, state, 40, "TOOLING_OR_ADAPTER", "agent", "run", "--lane", "demo", "--profile", profile, "--profile-id", "local", "--family", "family-a", "--seat-id", "writer-seat", "--cost-class", "economy", "--capability", "writer", "--timeout", "1ms", "--output-bytes", "32", "--arg", "--sleep-ms", "--arg", "100")
+		restore := injectRunner(memoryRunner{})
+		defer restore()
+		assertCLIClass(t, state, 40, "TOOLING_OR_ADAPTER", "agent", "run", "--lane", "demo", "--profile", "/bin/true", "--profile-id", "local", "--family", "family-a", "--seat-id", "writer-seat", "--cost-class", "economy", "--capability", "writer", "--timeout", "1ms", "--output-bytes", "32", "--arg", "--sleep-ms", "--arg", "100")
 	})
 	t.Run("profile exceeds dispatch limits", func(t *testing.T) {
 		_, state, _ := setupLane(t)
@@ -230,4 +238,41 @@ func fakeProfile(t *testing.T) string {
 		t.Fatalf("build fake agent: %v %s", err, out)
 	}
 	return path
+}
+
+// memoryRunner is the in-memory process-runner adapter. Two adapters make
+// the runner seam real; this one stays test-scoped and replaces a compiled
+// fake agent per subtest. It honors the fake agent's --sleep-ms convention:
+// a sleep beyond the profile timeout reports the supervisor's timeout
+// failure without spawning a process.
+type memoryRunner struct{}
+
+func (memoryRunner) Run(ctx context.Context, request process.Request) (process.Result, error) {
+	args := append(append([]string(nil), request.Profile.Args...), request.Args...)
+	sleep := time.Duration(0)
+	for i, arg := range args {
+		if arg == "--sleep-ms" && i+1 < len(args) {
+			if ms, err := strconv.Atoi(args[i+1]); err == nil {
+				sleep = time.Duration(ms) * time.Millisecond
+			}
+		}
+	}
+	if sleep > request.Profile.Timeout {
+		return process.Result{
+			ExitCode: -1, TimedOut: true,
+			StdoutHash: process.EmptyStreamHash(), StderrHash: process.EmptyStreamHash(),
+		}, failure.Wrap(failure.ToolingOrAdapter, "agent process timeout", context.DeadlineExceeded)
+	}
+	hash := sha256.Sum256([]byte("ok"))
+	streamHash := hex.EncodeToString(hash[:])
+	return process.Result{
+		ExitCode: 0, Stdout: []byte("ok"),
+		StdoutHash: streamHash, StderrHash: process.EmptyStreamHash(),
+	}, nil
+}
+
+func injectRunner(runner process.Runner) func() {
+	previous := agentRunner
+	agentRunner = runner
+	return func() { agentRunner = previous }
 }

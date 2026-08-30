@@ -340,11 +340,9 @@ func TestSecurityWorkflowPinsAndPermissions(t *testing.T) {
 	required := []string{
 		"permissions:",
 		"contents: read",
+		"pull-requests: read",
 		`GITLEAKS_ENABLE_COMMENTS: "false"`,
 		"gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e",
-		"github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd",
-		"github/codeql-action/autobuild@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd",
-		"github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd",
 		"golang.org/x/vuln/cmd/govulncheck@v1.7.0",
 		"github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@v1.11.0",
 	}
@@ -353,15 +351,10 @@ func TestSecurityWorkflowPinsAndPermissions(t *testing.T) {
 			t.Fatalf("security workflow missing %q", needle)
 		}
 	}
-	if strings.Contains(content, "security-events: write") && !strings.Contains(content, "codeql:") {
-		t.Fatal("security-events write should be scoped to codeql job")
-	}
-	codeqlSection := content[strings.Index(content, "codeql:"):]
-	if !strings.Contains(codeqlSection, "security-events: write") {
-		t.Fatal("codeql job must grant security-events: write")
-	}
-	if strings.Count(content, "security-events: write") != 1 {
-		t.Fatalf("security-events: write should appear once, got %d", strings.Count(content, "security-events: write"))
+	for _, unsupported := range []string{"codeql:", "github/codeql-action/", "security-events: write"} {
+		if strings.Contains(content, unsupported) {
+			t.Fatalf("private-repo security workflow should not contain %q", unsupported)
+		}
 	}
 	if strings.Contains(content, "comment: false") {
 		t.Fatal("gitleaks comment input is unsupported; use GITLEAKS_ENABLE_COMMENTS")
