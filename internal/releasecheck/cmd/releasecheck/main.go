@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/provehito-project/provehito/internal/releasecheck"
+	"github.com/rremedio-web/provehito/internal/releasecheck"
 )
 
 func main() {

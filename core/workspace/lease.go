@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/provehito-project/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/failure"
 )
 
 // LeaseManager coordinates leases in one explicit state root.

@@ -11,9 +11,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/provehito-project/provehito/core/clock"
-	"github.com/provehito-project/provehito/core/failure"
-	"github.com/provehito-project/provehito/core/fingerprint"
+	"github.com/rremedio-web/provehito/core/clock"
+	"github.com/rremedio-web/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/fingerprint"
 )
 
 // Store is an immutable content-addressed evidence store rooted outside the

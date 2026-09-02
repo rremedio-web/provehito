@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/provehito-project/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/failure"
 )
 
 // result is deliberately a fixed-shape envelope. Field order is part of the

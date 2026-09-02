@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/provehito-project/provehito/core/clock"
-	"github.com/provehito-project/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/clock"
+	"github.com/rremedio-web/provehito/core/failure"
 )
 
 // Fingerprint identifies the exact Git candidate and the bytes changed from

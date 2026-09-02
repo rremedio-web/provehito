@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/provehito-project/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/failure"
 )
 
 // CanonicalPath returns an absolute path with every existing path component

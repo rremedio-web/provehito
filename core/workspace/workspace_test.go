@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/provehito-project/provehito/core/failure"
-	"github.com/provehito-project/provehito/core/workspace"
+	"github.com/rremedio-web/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/workspace"
 )
 
 func TestStateRootCannotOverlapWorkspace(t *testing.T) {

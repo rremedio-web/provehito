@@ -1,6 +1,6 @@
 package lifecycle
 
-import "github.com/provehito-project/provehito/core/failure"
+import "github.com/rremedio-web/provehito/core/failure"
 
 // ParseEvent parses one exact CLI event token. It deliberately does not
 // normalize or interpret prose, so untrusted agent output cannot become an

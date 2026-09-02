@@ -1,17 +1,29 @@
 # Releasing
 
-Stage 2 adds deterministic, git-archive-only release construction with local
-structural validation and optional private denylist certification. Releases are
-built from `git archive` at a clean `HEAD`; no private repository access,
-artifact upload, or deployment is part of this stage.
+Stage 2 adds deterministic, git-archive-only source construction with local
+structural validation and optional private denylist certification. Source
+archives are built from `git archive` at a clean `HEAD`. Binary artifacts are
+built locally by a maintainer script; Provehito itself does not upload,
+publish, or deploy. A human creates the GitHub Release.
+
+Provehito is a pre-release local CLI. CI currently validates the project on
+macOS and Linux. Security automation includes gitleaks, govulncheck and
+deterministic SBOM generation. The project has not yet published a stable
+release.
 
 ## Toolchain
 
-Official versions for Stage 2:
+Official versions:
 
 - Go **1.26.7** (`go` and `toolchain` directives in `go.mod`)
-- govulncheck **v1.6.0**
-- **openssl** (required for archive SHA-256 via `openssl dgst -sha256 -r`)
+- govulncheck **v1.7.0**
+- cyclonedx-gomod **v1.11.0**
+- **openssl** (required for SHA-256 via `openssl dgst -sha256 -r`)
+
+The language version is Go 1.26. The `toolchain` directive pins **go1.26.7** so
+contributor machines, CI, and release archives compile with the same certified
+patch. CI workflows must use `go-version: "1.26.7"`. `internal/sourceguard`
+checks that these pins stay in sync with this document.
 
 ## Modes
 
@@ -39,6 +51,31 @@ Runs the same deterministic archive construction and adds a private denylist
 scan. A missing or unreadable denylist is tooling-incomplete (nonzero exit).
 Blank and `#` comment lines in the denylist are ignored. Matching needles are
 never printed—only rule and path.
+
+### Maintainer binaries (not uploaded by the engine)
+
+```sh
+VERSION=0.1.0 scripts/build-release-binaries.sh OUTPUT_DIR
+```
+
+Cross-compiles `CGO_ENABLED=0` binaries for `darwin/arm64`, `darwin/amd64`,
+`linux/arm64`, and `linux/amd64`, injects version/commit/build-date via
+`-ldflags`, and writes `SHA256SUMS`. **`OUTPUT_DIR` must not exist** and should
+live outside the repository (`bin/` is a forbidden path segment in source
+archives). The script does not upload artifacts.
+
+## Publishing a GitHub Release
+
+A human publishes. From a clean default-branch commit tagged `v0.1.0`:
+
+1. `scripts/release.sh --structural-only SOURCE_DIR`
+2. `VERSION=0.1.0 scripts/build-release-binaries.sh BINARY_DIR`
+3. Create the GitHub Release with the four binaries, `SHA256SUMS`,
+   `SOURCE_DIR/provehito.zip`, short notes, known limitations, and install
+   instructions (`go install github.com/rremedio-web/provehito/cmd/provehito@v0.1.0`).
+
+The hosting platform also attaches a tag source archive. The CLI still does not
+push, merge, deploy, or publish.
 
 ## Preconditions
 
@@ -95,21 +132,20 @@ Allowlisted URL hosts: `example.com`, `example.org`, `example.net` (and
 subdomains), `localhost`, `127.0.0.1`, `json-schema.org`, `apache.org` (and
 subdomains).
 
-## External gates (UNPROVEN until CI runs)
+## External gates
 
-The following run only in `.github/workflows/security.yml` on the remote CI
-host. Local absence or unavailability must not be treated as PASS:
+The following run in `.github/workflows/security.yml` on the remote CI host.
+Local absence or unavailability must not be treated as PASS:
 
 | Gate | Tool | Status |
 | --- | --- | --- |
-| Vulnerability scan | govulncheck v1.6.0 | **UNPROVEN** |
-| Static analysis | CodeQL | **UNPROVEN** |
-| Secret scan | gitleaks | **UNPROVEN** |
-| SBOM | cyclonedx-gomod v1.10.0 | **UNPROVEN** |
+| Vulnerability scan | govulncheck v1.7.0 | running in GitHub Actions |
+| Secret scan | gitleaks | running in GitHub Actions |
+| SBOM | cyclonedx-gomod v1.11.0 | running in GitHub Actions |
 | Malware scan | ClamAV / YARA | **not configured** |
 
-No claim of malware-free or remote CI PASS is made until these workflows have
-run successfully on the target repository.
+Acceptance CI in `.github/workflows/ci.yml` runs `scripts/acceptance.sh` on
+macOS and Linux.
 
 ## Local verification
 

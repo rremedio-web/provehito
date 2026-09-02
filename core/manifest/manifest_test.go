@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/provehito-project/provehito/core/canon"
-	"github.com/provehito-project/provehito/core/clock"
-	"github.com/provehito-project/provehito/core/failure"
-	"github.com/provehito-project/provehito/core/lifecycle"
-	"github.com/provehito-project/provehito/core/manifest"
+	"github.com/rremedio-web/provehito/core/canon"
+	"github.com/rremedio-web/provehito/core/clock"
+	"github.com/rremedio-web/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/lifecycle"
+	"github.com/rremedio-web/provehito/core/manifest"
 )
 
 func TestStoreLoadsCanonicalManifest(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/provehito-project/provehito/core/clock"
+	"github.com/rremedio-web/provehito/core/clock"
 )
 
 func TestFixedReturnsConfiguredTime(t *testing.T) {

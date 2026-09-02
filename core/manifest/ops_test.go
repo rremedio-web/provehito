@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/provehito-project/provehito/core/clock"
-	"github.com/provehito-project/provehito/core/failure"
-	"github.com/provehito-project/provehito/core/lifecycle"
-	"github.com/provehito-project/provehito/core/manifest"
+	"github.com/rremedio-web/provehito/core/clock"
+	"github.com/rremedio-web/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/lifecycle"
+	"github.com/rremedio-web/provehito/core/manifest"
 )
 
 func opHash(char string) string { return strings.Repeat(char, 64) }

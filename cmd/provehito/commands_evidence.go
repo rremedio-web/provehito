@@ -3,10 +3,10 @@ package main
 import (
 	"strings"
 
-	"github.com/provehito-project/provehito/core/evidence"
-	"github.com/provehito-project/provehito/core/failure"
-	"github.com/provehito-project/provehito/core/lifecycle"
-	"github.com/provehito-project/provehito/core/manifest"
+	"github.com/rremedio-web/provehito/core/evidence"
+	"github.com/rremedio-web/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/lifecycle"
+	"github.com/rremedio-web/provehito/core/manifest"
 )
 
 func runEvidence(operation string, args []string, stdout, stderr interface{ Write([]byte) (int, error) }) int {

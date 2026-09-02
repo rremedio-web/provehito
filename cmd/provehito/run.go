@@ -5,6 +5,26 @@ import (
 	"io"
 )
 
+const usageText = `usage: provehito [--json] <command>
+
+  init                 create a private state root outside the workspace
+  doctor               read-only checks for OS, Git, schema, and state
+  lane open            record a complete dispatch and activate a lane
+  lane list            read-only aggregate of current lane state
+  lane validate|status read a manifest and its current hash
+  lane block|resume|abandon|incident
+  agent run            run one configured local process in the foreground
+  freeze               bind a clean Git candidate to exact fingerprints
+  evidence add|verify  add or verify content-addressed receipts
+  review open|record   inspect the frozen candidate or record a verdict
+  ready                report READY when review and evidence pass
+  close                close a ready lane
+  version              print version, commit, and build date
+  help                 print this help
+
+READY is a local workflow result, not authorization to merge or deploy.
+`
+
 func jsonRequested(args []string) bool {
 	for _, arg := range args {
 		if arg == "--json" {
@@ -12,6 +32,24 @@ func jsonRequested(args []string) bool {
 		}
 	}
 	return false
+}
+
+func globalCommand(args []string) string {
+	for _, arg := range args {
+		if arg == "--json" {
+			continue
+		}
+		return arg
+	}
+	return ""
+}
+
+func runHelp(jsonOutput bool, stdout io.Writer) int {
+	if jsonOutput {
+		return writeResult(stdout, io.Discard, "help", true, map[string]any{"usage": usageText}, nil)
+	}
+	fmt.Fprint(stdout, usageText)
+	return 0
 }
 
 // Run executes one explicit CLI command and returns its stable process exit
@@ -23,12 +61,14 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if stderr == nil {
 		stderr = io.Discard
 	}
-	if len(args) == 0 || args[0] == "help" {
-		if len(args) == 1 && args[0] == "help" {
-			fmt.Fprintln(stdout, "usage: provehito init|doctor|lane <open|list|validate|status|block|resume|abandon|incident>")
-			return 0
-		}
+
+	switch globalCommand(args) {
+	case "":
 		return writeResult(stdout, stderr, "", jsonRequested(args), nil, usageError("missing command"))
+	case "help", "--help", "-h":
+		return runHelp(jsonRequested(args), stdout)
+	case "version", "--version":
+		return runVersion(jsonRequested(args), stdout, stderr)
 	}
 
 	switch args[0] {

@@ -4,12 +4,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/provehito-project/provehito/core/evidence"
-	"github.com/provehito-project/provehito/core/failure"
-	"github.com/provehito-project/provehito/core/fingerprint"
-	"github.com/provehito-project/provehito/core/lifecycle"
-	"github.com/provehito-project/provehito/core/manifest"
-	"github.com/provehito-project/provehito/core/policy"
+	"github.com/rremedio-web/provehito/core/evidence"
+	"github.com/rremedio-web/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/fingerprint"
+	"github.com/rremedio-web/provehito/core/lifecycle"
+	"github.com/rremedio-web/provehito/core/manifest"
+	"github.com/rremedio-web/provehito/core/policy"
 )
 
 func h(char string) string { return strings.Repeat(char, 64) }

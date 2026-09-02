@@ -2,7 +2,8 @@
 
 This walkthrough uses a temporary, neutral Git repository and a standard
 system executable as the configured local process. It leaves the source tree
-untouched. Run it from the Provehito repository root with Go 1.26 or later.
+untouched. Run it from the Provehito repository root with Go 1.26. CI and
+release builds use the certified toolchain 1.26.7.
 
 The state root and workspace must be different directories. The state root is
 private runtime data; the workspace is the Git repository being coordinated.

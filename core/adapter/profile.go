@@ -7,7 +7,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/provehito-project/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/failure"
 )
 
 // Profile is a static local-process launch profile. Arguments are passed

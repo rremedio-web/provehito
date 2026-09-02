@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/provehito-project/provehito/core/adapter"
-	"github.com/provehito-project/provehito/core/failure"
-	"github.com/provehito-project/provehito/core/workspace"
+	"github.com/rremedio-web/provehito/core/adapter"
+	"github.com/rremedio-web/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/workspace"
 )
 
 // Request describes one foreground launch. Args are appended to the profile's

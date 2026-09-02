@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/provehito-project/provehito/core/adapter"
-	"github.com/provehito-project/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/adapter"
+	"github.com/rremedio-web/provehito/core/failure"
 )
 
 func TestCostRankForMapsTheDeclaredVocabulary(t *testing.T) {

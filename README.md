@@ -1,19 +1,82 @@
 # Provehito
 
-Provehito is a provider-neutral local workflow engine for coordinating coding
-work without turning agent messages into authority. Phase 1 provides a Go CLI
-and reusable core for one writer in one Git workspace: it records a dispatch,
-supervises a configured local process, freezes an exact candidate, verifies
-evidence, binds an independent review, and reports readiness.
+Provehito is a local Go CLI for coordinating AI coding agents safely. It
+records what an agent was asked to do, freezes the exact Git candidate it
+produced, verifies evidence, requires an independent review, and reports
+whether the work is ready—without merging or deploying anything itself.
 
-## Status
+## Why I built it
 
-Phase 1 is implemented locally and remains pre-release. Stage 2 adds
-deterministic git-archive release construction, structural ZIP validation, and
-CI/security workflow definitions. No remote repository, artifact upload, or
-deployment is part of this state. See [docs/releasing.md](docs/releasing.md) for
-release modes, receipts, and external gate boundaries. The supported runtime
-boundary is macOS and Linux. JSON is the only authoritative manifest format.
+AI coding agents can produce useful patches, but a chat transcript is not a
+record of the dispatch, the exact bytes that changed, the evidence that was
+checked, or an independent review of that candidate. I built Provehito so those
+facts are explicit local state, and so `READY` never means the tool may push,
+merge, or deploy.
+
+## Lifecycle
+
+```mermaid
+flowchart LR
+  dispatch[Record dispatch]
+  run[Run agent]
+  freeze[Freeze Git candidate]
+  review[Independent review]
+  ready[Report ready]
+  dispatch --> run --> freeze --> review --> ready
+```
+
+The engine coordinates one writer in one Git workspace. Agent messages have no
+authority: they cannot approve, review, or transition a lane.
+
+## 30-second example
+
+Requires Go 1.26. CI and release builds use the certified toolchain **1.26.7**.
+
+```sh
+go install github.com/rremedio-web/provehito/cmd/provehito@latest
+provehito --version
+provehito --help
+```
+
+The complete neutral walkthrough is in [docs/quickstart.md](docs/quickstart.md).
+It builds the CLI, creates a temporary toy repository, runs the lifecycle, and
+ends in `CLOSED` without a model account, network connection, or credential.
+
+## Major engineering decisions
+
+- **State before chat.** Canonical JSON manifests are authoritative. Transcripts
+  and agent claims are untrusted.
+- **One writer per workspace.** Concurrent writers are rejected.
+- **Review frozen bytes.** A review binds to the exact Git candidate fingerprint
+  recorded at freeze, not a branch name.
+- **No outward actions.** Provehito does not push, merge, deploy, publish, or
+  open network sockets. `READY` is a workflow result, not authorization.
+- **macOS and Linux only.** JSON is the only authoritative manifest format.
+
+## Current limitations
+
+- Pre-release: there is no stable compatibility promise.
+- Windows is unsupported.
+- Configured subprocesses are not sandboxed; they keep host permissions.
+- Allowed paths, forbidden paths, and `max_memory_bytes` are recorded policy,
+  not OS enforcement.
+- The Go language version is 1.26. The `toolchain` directive pins **go1.26.7**
+  so contributor, CI, and release builds use the same certified compiler.
+
+## Test and security status
+
+Provehito is a pre-release local CLI. CI currently validates the project on
+macOS and Linux. Security automation includes gitleaks, govulncheck and
+deterministic SBOM generation. The project has not yet published a stable
+release. See [docs/releasing.md](docs/releasing.md) for release modes, receipts,
+and remote gate boundaries.
+
+## AI-assisted development
+
+Provehito was developed with extensive assistance from Claude Code and Codex. I
+defined the product requirements, safety model and architecture, directed the
+implementation, reviewed the generated changes, and validated the result
+through automated tests and independent review passes.
 
 ## Safety boundary
 
@@ -31,12 +94,6 @@ in Phase 1; they are not OS enforcement. `agent run` does enforce the declared
 time and captured-output limits. Agent output is untrusted and cannot approve,
 review, or transition a lane.
 
-## Quick start
-
-Run the complete neutral Git walkthrough in [docs/quickstart.md](docs/quickstart.md).
-It builds the CLI, creates a temporary toy repository, runs the lifecycle, and
-ends in `CLOSED` without a model account, network connection, or credential.
-
 ## Command map
 
 | Command | Purpose |
@@ -53,6 +110,7 @@ ends in `CLOSED` without a model account, network connection, or credential.
 | `review open` / `record` | Inspect the frozen candidate and record a verdict. |
 | `ready` | Check review and evidence requirements; reports `READY` only. |
 | `close` | Close a ready lane. |
+| `version` | Print version, commit, and build date. |
 
 Every command has `--json`, with stable `ok`, `command`, `class`, `message`,
 optional `correction`, and `data` fields. See [docs/lifecycle.md](docs/lifecycle.md),

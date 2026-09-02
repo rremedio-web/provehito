@@ -18,6 +18,14 @@ Ordinary acceptance does not require a private denylist. Release certification
 with a private denylist uses `scripts/release.sh --private-denylist`. See
 [docs/releasing.md](docs/releasing.md).
 
+## Toolchain
+
+The language version is Go 1.26. The `toolchain` directive pins **go1.26.7** so
+contributor machines, CI, and release archives compile with the same certified
+patch. Install that toolchain before running `scripts/acceptance.sh`. The pin
+is for build identity, not a claim that the code uses 1.26.7-only language
+features.
+
 Do not add private names, home paths, credentials, transcripts, non-neutral
 domains, or organization-specific policy to public files. Keep state-root and
 workspace assumptions explicit. Changes that affect authority boundaries must
