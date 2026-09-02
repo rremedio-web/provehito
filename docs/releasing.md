@@ -21,9 +21,9 @@ Official versions:
 - **openssl** (required for SHA-256 via `openssl dgst -sha256 -r`)
 
 The language version is Go 1.26. The `toolchain` directive pins **go1.26.7** so
-contributor machines, CI, and release archives compile with the same certified
-patch. CI workflows must use `go-version: "1.26.7"`. `internal/sourceguard`
-checks that these pins stay in sync with this document.
+contributor machines, CI, and release archives compile with the same patch. CI
+workflows must use `go-version: "1.26.7"`. `internal/sourceguard` checks that
+these pins stay in sync with this document.
 
 ## Modes
 

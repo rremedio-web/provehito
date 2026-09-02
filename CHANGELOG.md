@@ -4,6 +4,10 @@ All notable changes are recorded here.
 
 ## Unreleased
 
+- Replaced "certified toolchain" wording with a pin to Go 1.26.7.
+- Combined README limitation and scope notes, and added a terminal GIF of the
+  dispatch-to-ready lifecycle.
+
 ## 0.1.0 — 2026-09-02
 
 - Added the local CLI and reusable Go core for explicit lane lifecycle,

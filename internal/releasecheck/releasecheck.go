@@ -355,7 +355,19 @@ func mustCompilePattern(encoded string) *regexp.Regexp {
 	return regexp.MustCompile(string(data))
 }
 
+func binaryAssetExt(rel string) bool {
+	switch strings.ToLower(path.Ext(rel)) {
+	case ".gif", ".png", ".jpg", ".jpeg", ".webp":
+		return true
+	default:
+		return false
+	}
+}
+
 func scanContent(rel string, content []byte) []Finding {
+	if binaryAssetExt(rel) {
+		return nil
+	}
 	var findings []Finding
 	if bytes.IndexByte(content, 0) >= 0 {
 		findings = append(findings, Finding{Rule: "nul-content", Path: rel})

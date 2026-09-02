@@ -151,6 +151,22 @@ func TestRejectNULContent(t *testing.T) {
 	assertFinding(t, result, "nul-content")
 }
 
+func TestAllowImageBinaryAssets(t *testing.T) {
+	t.Parallel()
+	payload := "GIF89a\x00\x00" + "https://" + "github.com/example/not-a-repo\x00"
+	z := buildZip(t, map[string]string{
+		"provehito/docs/assets/lifecycle.gif": payload,
+		"provehito/README.md":                 "# ok\n",
+	})
+	result, err := releasecheck.Check(z, releasecheck.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.StructuralStatus != releasecheck.StatusPass {
+		t.Fatalf("image asset should pass structural scan, got %#v", result.Findings)
+	}
+}
+
 func TestRejectForbiddenGit(t *testing.T) {
 	t.Parallel()
 	z := buildZip(t, map[string]string{"provehito/.git/config": "[core]\n"})

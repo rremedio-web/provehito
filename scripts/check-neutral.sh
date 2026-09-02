@@ -11,6 +11,16 @@ fi
 
 failed=0
 
+grep_pathspec=(
+	.
+	':(exclude).superpowers/**'
+	':(exclude)*.gif'
+	':(exclude)*.png'
+	':(exclude)*.jpg'
+	':(exclude)*.jpeg'
+	':(exclude)*.webp'
+)
+
 decode_pattern() {
 	printf '%s' "$1" | base64 -d 2>/dev/null || printf '%s' "$1" | base64 -D
 }
@@ -20,8 +30,7 @@ check_content() {
 	local pattern_b64=$2
 	local pattern
 	pattern=$(decode_pattern "$pattern_b64")
-	local matches
-	if matches=$(git grep -nEi -- "$pattern" -- . ':(exclude).superpowers/**' 2>/dev/null); then
+	if git grep -nEi -- "$pattern" -- "${grep_pathspec[@]}" >/dev/null 2>&1; then
 		printf 'neutral check: %s\n' "$label" >&2
 		failed=1
 	fi
@@ -45,7 +54,7 @@ while IFS= read -r url; do
 			failed=1
 			;;
 	esac
-done < <(git grep -hEo -- 'https?://[^[:space:]"<>]+' -- . ':(exclude).superpowers/**' 2>/dev/null || true)
+done < <(git grep -hEo -- 'https?://[^[:space:]"<>]+' -- "${grep_pathspec[@]}" 2>/dev/null || true)
 
 while IFS= read -r path; do
 	case "$path" in
@@ -65,7 +74,7 @@ if (( $# == 1 )); then
 	fi
 	while IFS= read -r needle || [[ -n "$needle" ]]; do
 		[[ -z "$needle" || "$needle" == \#* ]] && continue
-		if git grep -F -l -- "$needle" -- . ':(exclude).superpowers/**' >/dev/null 2>&1; then
+		if git grep -F -l -- "$needle" -- "${grep_pathspec[@]}" >/dev/null 2>&1; then
 			printf '%s\n' 'neutral check: private denylist match found' >&2
 			failed=1
 		fi

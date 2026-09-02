@@ -1,9 +1,8 @@
 # Provehito
 
-Provehito is a local Go CLI for coordinating AI coding agents safely. It
-records what an agent was asked to do, freezes the exact Git candidate it
-produced, verifies evidence, requires an independent review, and reports
-whether the work is ready—without merging or deploying anything itself.
+Provehito is a local Go CLI for coordinating AI coding-agent work through
+explicit dispatches, frozen Git candidates, evidence checks and independent
+review. It never merges or deploys work itself.
 
 ## Why I built it
 
@@ -15,22 +14,14 @@ merge, or deploy.
 
 ## Lifecycle
 
-```mermaid
-flowchart LR
-  dispatch[Record dispatch]
-  run[Run agent]
-  freeze[Freeze Git candidate]
-  review[Independent review]
-  ready[Report ready]
-  dispatch --> run --> freeze --> review --> ready
-```
+dispatch → run → freeze → review → ready
 
-The engine coordinates one writer in one Git workspace. Agent messages have no
-authority: they cannot approve, review, or transition a lane.
+![Terminal recording of provehito going from dispatch through run, freeze, review, and ready](docs/assets/lifecycle.gif)
 
 ## 30-second example
 
-Requires Go 1.26. CI and release builds use the certified toolchain **1.26.7**.
+Requires Go 1.26. The toolchain is pinned to Go **1.26.7** for reproducible
+contributor, CI, and release builds.
 
 ```sh
 go install github.com/rremedio-web/provehito/cmd/provehito@latest
@@ -38,8 +29,8 @@ provehito --version
 provehito --help
 ```
 
-The complete neutral walkthrough is in [docs/quickstart.md](docs/quickstart.md).
-It builds the CLI, creates a temporary toy repository, runs the lifecycle, and
+The complete walkthrough is in [docs/quickstart.md](docs/quickstart.md). It
+builds the CLI, creates a temporary toy repository, runs the lifecycle, and
 ends in `CLOSED` without a model account, network connection, or credential.
 
 ## Major engineering decisions
@@ -57,11 +48,23 @@ ends in `CLOSED` without a model account, network connection, or credential.
 
 - Pre-release: there is no stable compatibility promise.
 - Windows is unsupported.
-- Configured subprocesses are not sandboxed; they keep host permissions.
-- Allowed paths, forbidden paths, and `max_memory_bytes` are recorded policy,
-  not OS enforcement.
-- The Go language version is 1.26. The `toolchain` directive pins **go1.26.7**
-  so contributor, CI, and release builds use the same certified compiler.
+- No daemon, dashboard, hosted account, telemetry, chat system, credential
+  vault, remote control, automatic cleanup, or external-action integration.
+- Process output is bounded in memory for hashing; `agent run` receipts record
+  exit status, duration, truncation flags, and stdout/stderr SHA-256 hashes.
+  Live streaming is not promised.
+
+## Safety boundary
+
+Configured subprocesses are trusted operator choices and are not sandboxed.
+The executable receives its declared argument vector, working directory, and
+allowlisted environment, but it can still use host permissions. Use an
+operator-supplied OS sandbox when stronger containment is required.
+
+Allowed paths, forbidden paths, and `max_memory_bytes` are recorded policy,
+not OS enforcement. `agent run` does enforce the declared time and
+captured-output limits. Agent output is untrusted and cannot approve, review,
+or transition a lane.
 
 ## Test and security status
 
@@ -73,26 +76,9 @@ and remote gate boundaries.
 
 ## AI-assisted development
 
-Provehito was developed with extensive assistance from Claude Code and Codex. I
-defined the product requirements, safety model and architecture, directed the
-implementation, reviewed the generated changes, and validated the result
-through automated tests and independent review passes.
-
-## Safety boundary
-
-Provehito does not push, merge, deploy, publish, or store credentials. `READY`
-is a workflow result, not authorization to perform an external action.
-
-Configured subprocesses are trusted operator choices and are not sandboxed by
-Provehito. The executable receives its declared argument vector, working
-directory, and allowlisted environment, but it can still use the host
-permissions available to it. Use an operator-supplied OS sandbox when stronger
-containment is required. Provehito itself opens no network sockets.
-
-Allowed paths, forbidden paths, and `max_memory_bytes` are recorded policy data
-in Phase 1; they are not OS enforcement. `agent run` does enforce the declared
-time and captured-output limits. Agent output is untrusted and cannot approve,
-review, or transition a lane.
+Provehito was developed with extensive Claude Code and Codex assistance. I
+retained ownership of the requirements, architecture, testing, and final
+review.
 
 ## Command map
 
@@ -116,11 +102,3 @@ Every command has `--json`, with stable `ok`, `command`, `class`, `message`,
 optional `correction`, and `data` fields. See [docs/lifecycle.md](docs/lifecycle.md),
 [docs/manifest.md](docs/manifest.md), [docs/evidence.md](docs/evidence.md), and
 [docs/troubleshooting.md](docs/troubleshooting.md).
-
-## Scope boundaries
-
-Phase 1 has no daemon, dashboard, hosted account, telemetry service, chat
-system, credential vault, remote control, automatic cleanup, or external-action
-integration. It does not promise live output streaming: process output is
-bounded in memory for hashing; `agent run` receipts record exit status,
-duration, truncation flags, and stdout/stderr SHA-256 hashes only.
