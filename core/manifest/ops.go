@@ -1,8 +1,8 @@
 package manifest
 
 import (
-	"github.com/provehito-project/provehito/core/failure"
-	"github.com/provehito-project/provehito/core/lifecycle"
+	"github.com/rremedio-web/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/lifecycle"
 )
 
 // ExpectedHash is the caller-facing compare-and-swap expectation of one lane

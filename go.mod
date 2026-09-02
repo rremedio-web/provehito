@@ -1,4 +1,4 @@
-module github.com/provehito-project/provehito
+module github.com/rremedio-web/provehito
 
 go 1.26
 

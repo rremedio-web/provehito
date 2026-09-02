@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/provehito-project/provehito/core/canon"
+	"github.com/rremedio-web/provehito/core/canon"
 )
 
 func TestHashIgnoresPresentationFormatting(t *testing.T) {

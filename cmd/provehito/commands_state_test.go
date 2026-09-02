@@ -19,6 +19,63 @@ func TestUnknownCommandIsUsageFailure(t *testing.T) {
 	}
 }
 
+func TestHelpListsLifecycleCommands(t *testing.T) {
+	var out, errOut bytes.Buffer
+	code := Run([]string{"--help"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("got %d stderr=%s stdout=%s", code, errOut.String(), out.String())
+	}
+	for _, needle := range []string{"freeze", "evidence", "review", "ready", "close", "agent run", "version"} {
+		if !strings.Contains(out.String(), needle) {
+			t.Fatalf("help missing %q:\n%s", needle, out.String())
+		}
+	}
+
+	code, result, _ := runJSON(t, "help")
+	if code != 0 || result["ok"] != true || result["command"] != "help" {
+		t.Fatalf("%d %#v", code, result)
+	}
+	data, _ := result["data"].(map[string]any)
+	usage, _ := data["usage"].(string)
+	if !strings.Contains(usage, "freeze") {
+		t.Fatalf("json help missing freeze: %#v", result)
+	}
+}
+
+func TestVersionReportsInjectedMetadata(t *testing.T) {
+	prevVersion, prevCommit, prevDate := version, commit, date
+	t.Cleanup(func() {
+		version, commit, date = prevVersion, prevCommit, prevDate
+	})
+	version, commit, date = "0.1.0-test", "deadbeef", "2026-09-02T00:00:00Z"
+
+	var out, errOut bytes.Buffer
+	code := Run([]string{"--version"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("got %d stderr=%s stdout=%s", code, errOut.String(), out.String())
+	}
+	got := out.String()
+	for _, needle := range []string{"RESULT: OK version", "version: 0.1.0-test", "commit: deadbeef", "date: 2026-09-02T00:00:00Z"} {
+		if !strings.Contains(got, needle) {
+			t.Fatalf("version output missing %q:\n%s", needle, got)
+		}
+	}
+
+	code, result, _ := runJSON(t, "--version")
+	if code != 0 || result["ok"] != true || result["command"] != "version" {
+		t.Fatalf("%d %#v", code, result)
+	}
+	data, _ := result["data"].(map[string]any)
+	if data["version"] != "0.1.0-test" || data["commit"] != "deadbeef" || data["date"] != "2026-09-02T00:00:00Z" {
+		t.Fatalf("version data = %#v", data)
+	}
+
+	code, result, _ = runJSON(t, "--json", "--version")
+	if code != 0 || result["command"] != "version" {
+		t.Fatalf("leading --json: %d %#v", code, result)
+	}
+}
+
 func TestInitRejectsStateInsideWorkspaceWithoutWriting(t *testing.T) {
 	work := t.TempDir()
 	state := filepath.Join(work, "state")

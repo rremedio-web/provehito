@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/provehito-project/provehito/core/clock"
-	"github.com/provehito-project/provehito/core/evidence"
-	"github.com/provehito-project/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/clock"
+	"github.com/rremedio-web/provehito/core/evidence"
+	"github.com/rremedio-web/provehito/core/failure"
 )
 
 func TestVerifyDetectsTampering(t *testing.T) {

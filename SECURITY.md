@@ -27,17 +27,21 @@ Releases are built from `git archive` only. `scripts/release.sh` requires a
 clean worktree, builds two identical archives, validates them with
 `internal/releasecheck`, and writes a deterministic receipt. Structural scans
 run in contributors/CI; private denylist scans are for release certification
-only. Remote gates (govulncheck, CodeQL, gitleaks, SBOM) are defined in
-`.github/workflows/security.yml` and remain **UNPROVEN** until CI runs. ClamAV
+only. Remote gates (govulncheck, gitleaks, SBOM) are defined in
+`.github/workflows/security.yml` and currently run on GitHub Actions. ClamAV
 and YARA are not configured in this stage. See [docs/releasing.md](docs/releasing.md).
+
+Provehito is a pre-release local CLI. CI currently validates the project on
+macOS and Linux. Security automation includes gitleaks, govulncheck and
+deterministic SBOM generation. The project has not yet published a stable
+release.
 
 ## Reporting a vulnerability
 
 Do not include secrets, private data, or exploit details in a public issue.
-Until a public release is available, ask the maintainers for a private
-reporting channel. After publication, use the hosting platform’s private
-security-advisory workflow when that workflow is available; this document does
-not claim that such an advisory is currently enabled.
+Use the hosting platform’s private vulnerability-reporting workflow. This
+document does not claim that GitHub private vulnerability reporting is
+currently enabled.
 
 Please provide the affected version or commit, operating system, minimal
 reproduction, impact, and any relevant logs with sensitive values removed.

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/provehito-project/provehito/core/clock"
-	"github.com/provehito-project/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/clock"
+	"github.com/rremedio-web/provehito/core/failure"
 )
 
 // maxManifestBytes bounds the allocation made while reading a stored manifest.

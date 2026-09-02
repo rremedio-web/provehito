@@ -10,9 +10,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/provehito-project/provehito/core/canon"
-	"github.com/provehito-project/provehito/core/failure"
-	"github.com/provehito-project/provehito/core/fingerprint"
+	"github.com/rremedio-web/provehito/core/canon"
+	"github.com/rremedio-web/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/fingerprint"
 )
 
 const (

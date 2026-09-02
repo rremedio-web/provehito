@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/provehito-project/provehito/core/failure"
-	"github.com/provehito-project/provehito/core/lifecycle"
+	"github.com/rremedio-web/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/lifecycle"
 )
 
 func TestApplyLegalTransitions(t *testing.T) {

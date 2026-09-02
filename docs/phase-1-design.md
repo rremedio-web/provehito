@@ -2,7 +2,8 @@
 
 *In altum — launch forth into the deep.*
 
-**Status:** Implemented locally; pre-release
+**Status:** Pre-release local CLI. CI validates macOS and Linux. Security
+automation includes gitleaks, govulncheck, and SBOM generation.
 **Date:** 2026-08-19
 **Scope:** Local CLI and reusable core library
 
@@ -161,6 +162,8 @@ provehito evidence add|verify
 provehito review open|record
 provehito ready
 provehito close
+provehito version
+provehito help
 ```
 
 Every command supports deterministic JSON output. Human output begins with the
@@ -306,7 +309,7 @@ requires no model account, API key, network connection, or proprietary CLI.
 
 ## Documentation set
 
-Before the first public release, the repository includes:
+The public repository includes:
 
 - `README.md` — purpose, non-goals, installation, and ten-minute quickstart;
 - `docs/architecture.md` — module and data-flow boundaries;

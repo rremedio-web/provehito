@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 
-	"github.com/provehito-project/provehito/core/failure"
-	"github.com/provehito-project/provehito/core/fingerprint"
-	"github.com/provehito-project/provehito/core/lifecycle"
-	"github.com/provehito-project/provehito/core/manifest"
+	"github.com/rremedio-web/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/fingerprint"
+	"github.com/rremedio-web/provehito/core/lifecycle"
+	"github.com/rremedio-web/provehito/core/manifest"
 )
 
 func runFreeze(args []string, stdout, stderr interface{ Write([]byte) (int, error) }) int {

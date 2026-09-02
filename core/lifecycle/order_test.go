@@ -3,7 +3,7 @@ package lifecycle_test
 import (
 	"testing"
 
-	"github.com/provehito-project/provehito/core/lifecycle"
+	"github.com/rremedio-web/provehito/core/lifecycle"
 )
 
 func TestOrderingPredicatesMatchTheLifecyclePosition(t *testing.T) {

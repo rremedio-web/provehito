@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/provehito-project/provehito/core/evidence"
+	"github.com/rremedio-web/provehito/core/evidence"
 )
 
 func syntheticTokenSecret() string {

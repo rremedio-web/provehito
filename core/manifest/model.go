@@ -9,9 +9,9 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/provehito-project/provehito/core/canon"
-	"github.com/provehito-project/provehito/core/failure"
-	"github.com/provehito-project/provehito/core/lifecycle"
+	"github.com/rremedio-web/provehito/core/canon"
+	"github.com/rremedio-web/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/lifecycle"
 )
 
 // Manifest is the complete durable description of one lane. Declared timestamp

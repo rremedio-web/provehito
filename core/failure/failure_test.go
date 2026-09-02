@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/provehito-project/provehito/core/failure"
+	"github.com/rremedio-web/provehito/core/failure"
 )
 
 func TestExitCodeFor(t *testing.T) {

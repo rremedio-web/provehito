@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -359,4 +360,70 @@ func TestSecurityWorkflowPinsAndPermissions(t *testing.T) {
 	if strings.Contains(content, "comment: false") {
 		t.Fatal("gitleaks comment input is unsupported; use GITLEAKS_ENABLE_COMMENTS")
 	}
+}
+
+func TestModulePathMatchesPublicRepository(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const want = "module github.com/rremedio-web/provehito\n"
+	if !strings.HasPrefix(string(data), want) {
+		t.Fatalf("go.mod first line = %q, want prefix %q", firstLine(string(data)), strings.TrimSuffix(want, "\n"))
+	}
+}
+
+func TestDocumentedToolVersionsMatchWorkflows(t *testing.T) {
+	security, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "security.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ci, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	goMod, err := os.ReadFile(filepath.Join("..", "..", "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	releasing, err := os.ReadFile(filepath.Join("..", "..", "docs", "releasing.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	govuln := findPin(t, string(security), `govulncheck@(v\d+\.\d+\.\d+)`)
+	cyclone := findPin(t, string(security), `cyclonedx-gomod@(v\d+\.\d+\.\d+)`)
+	workflowGo := findPin(t, string(security), `go-version:\s*"(\d+\.\d+\.\d+)"`)
+	ciGo := findPin(t, string(ci), `go-version:\s*"(\d+\.\d+\.\d+)"`)
+	toolchain := findPin(t, string(goMod), `(?m)^toolchain go(\d+\.\d+\.\d+)$`)
+	if workflowGo != toolchain {
+		t.Fatalf("security workflow go-version %q != go.mod toolchain %q", workflowGo, toolchain)
+	}
+	if ciGo != toolchain {
+		t.Fatalf("ci workflow go-version %q != go.mod toolchain %q", ciGo, toolchain)
+	}
+
+	docs := string(releasing)
+	for _, pin := range []string{govuln, cyclone, toolchain} {
+		if !strings.Contains(docs, pin) {
+			t.Fatalf("docs/releasing.md missing pin %q", pin)
+		}
+	}
+}
+
+func findPin(t *testing.T, content, pattern string) string {
+	t.Helper()
+	re := regexp.MustCompile(pattern)
+	match := re.FindStringSubmatch(content)
+	if len(match) < 2 {
+		t.Fatalf("pattern %q not found", pattern)
+	}
+	return match[1]
+}
+
+func firstLine(content string) string {
+	if i := strings.IndexByte(content, '\n'); i >= 0 {
+		return content[:i]
+	}
+	return content
 }
